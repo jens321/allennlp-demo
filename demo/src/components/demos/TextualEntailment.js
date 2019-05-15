@@ -2,6 +2,7 @@ import React from 'react';
 import { API_ROOT } from '../../api-config';
 import { withRouter } from 'react-router-dom';
 import HeatMap from '../HeatMap'
+import TextSaliencyMap from '../Interpretation'
 import Model from '../Model'
 import OutputField from '../OutputField'
 import {
@@ -13,6 +14,7 @@ import {
 import '../../css/TeComponent.css';
 
 const apiUrl = () => `${API_ROOT}/predict/textual-entailment`
+const apiUrlInterpret = () => `${API_ROOT}/interpret/textual-entailment`
 
 const title = "Textual Entailment"
 
@@ -76,9 +78,26 @@ const judgments = {
   NEUTRAL: <span>there is <strong>no correlation</strong> between the premise and hypothesis</span>
 }
 
-const Output = ({ responseData }) => {
+const Output = ({ requestData, responseData, interpretData, interpretModel }) => {
   const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
+  const { grad_input_1, grad_input_2 } = interpretData ? interpretData : {grad_input_1: [], grad_input_2: []}
+
   const [entailment, contradiction, neutral] = label_probs
+  
+  // request data contains {premise: "...", hypothesis: "..."} just as we would expect 
+
+  const premiseGrads = grad_input_2
+  const hypothesisGrads = grad_input_1
+
+  const premiseTokensWithWeights = premiseGrads.length !== 0 ? premise_tokens.map((token, idx) => {
+    let weight = premiseGrads[idx]
+    return {token, weight}
+  }) : []
+
+  const hypothesisTokensWithWeights = hypothesisGrads.length !== 0 ? hypothesis_tokens.map((token, idx) => {
+    let weight = hypothesisGrads[idx]
+    return {token, weight}
+  }) : []
 
   // Find judgment and confidence.
   let judgment
@@ -123,7 +142,7 @@ const Output = ({ responseData }) => {
   }
 
   function formatProb(n) {
-  return parseFloat((n * 100).toFixed(1)) + "%";
+    return parseFloat((n * 100).toFixed(1)) + "%";
   }
 
   // https://en.wikipedia.org/wiki/Ternary_plot#Plotting_a_ternary_plot
@@ -167,6 +186,26 @@ const Output = ({ responseData }) => {
     </div>
     <OutputField label=" Model internals">
       <Accordion accordion={false}>
+        <AccordionItem expanded={true}>
+          <AccordionItemTitle>
+            Interpretation Visualization
+            <div className="accordion__arrow" role="presentation"/>
+          </AccordionItemTitle>
+          <AccordionItemBody>
+            <p style={{backgroundColor: "#F6F8F9", padding: "15px", marginBottom: "10px"}}>
+                <strong>Red:</strong> a negative contribution to the prediction <br />
+                <strong>Blue:</strong> a positive contribution to the prediction 
+            </p>
+            <TextSaliencyMap tokensWithWeights={premiseTokensWithWeights} />
+            <TextSaliencyMap tokensWithWeights={hypothesisTokensWithWeights} />
+            <button
+              type="button"
+              className="btn"
+              style={{margin: "30px 0px"}}
+              onClick={ () => interpretModel(requestData) }>Interpret Prediction
+            </button>
+          </AccordionItemBody>
+        </AccordionItem>
         <AccordionItem expanded={true}>
           <AccordionItemTitle>
             Premise to Hypothesis Attention
@@ -222,6 +261,8 @@ const examples = [
   },
 ]
 
-const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output}
+const modelProps = {apiUrl, apiUrlInterpret, title, description, descriptionEllipsed, fields, examples, Output}
 
+// withRouter will pass updated match, location, and history props to the wrapped
+// component 
 export default withRouter(props => <Model {...props} {...modelProps}/>)

@@ -100,10 +100,12 @@ def make_app(build_dir: str = None,
     app.wsgi_app = ProxyFix(app.wsgi_app) # sets the requester IP with the X-Forwarded-For header
 
     for name, demo_model in models.items():
-        logger.info(f"loading {name} model")
-        predictor = demo_model.predictor()
-        app.predictors[name] = predictor
-        app.max_request_lengths[name] = demo_model.max_request_length
+        if name == 'machine-comprehension' or name == 'naqanet-reading-comprehension' \
+            or name == 'textual-entailment':
+            logger.info(f"loading {name} model")
+            predictor = demo_model.predictor()
+            app.predictors[name] = predictor
+            app.max_request_lengths[name] = demo_model.max_request_length
 
     @app.errorhandler(ServerError)
     def handle_invalid_usage(error: ServerError) -> Response:  # pylint: disable=unused-variable
@@ -160,6 +162,32 @@ def make_app(build_dir: str = None,
                 "requestData": permadata.request_data,
                 "responseData": permadata.response_data
         })
+
+    @app.route('/interpret/<model_name>', methods=['POST', 'OPTIONS'])
+    def interpret(model_name: str) -> Response: 
+        """
+        Interpret prediction of the model
+        """
+        if request.method == "OPTIONS":
+            return Response(response="", status=200)
+        lowered_model_name = model_name.lower()
+        model = app.predictors.get(lowered_model_name)
+        if model is None:
+            raise ServerError("unknown model: {}".format(model_name), status_code=400)
+        max_request_length = app.max_request_lengths[lowered_model_name]
+
+        print(request)
+        data = request.get_json()
+        print("THE DATA", data)
+
+        serialized_request = json.dumps(data)
+        if len(serialized_request) > max_request_length:
+            raise ServerError(f"Max request length exceeded for model {model_name}! " +
+                              f"Max: {max_request_length} Actual: {len(serialized_request)}")
+
+        interpretation = model.interpret_from_json(data)
+
+        return jsonify(interpretation)
 
     @app.route('/predict/<model_name>', methods=['POST', 'OPTIONS'])
     def predict(model_name: str) -> Response:  # pylint: disable=unused-variable

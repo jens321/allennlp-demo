@@ -6,15 +6,17 @@ class Model extends React.Component {
     constructor(props) {
       super(props);
 
-      const { requestData, responseData } = props;
+      const { requestData, responseData, interpretData } = props;
 
       this.state = {
         outputState: responseData ? "received" : "empty", // valid values: "working", "empty", "received", "error"
         requestData: requestData,
-        responseData: responseData
+        responseData: responseData,
+        interpretData: interpretData
       };
 
       this.runModel = this.runModel.bind(this)
+      this.interpretModel = this.interpretModel.bind(this)
     }
 
     runModel(inputs) {
@@ -50,6 +52,25 @@ class Model extends React.Component {
       });
     }
 
+    interpretModel(inputs) {
+      console.log('inputs', inputs)
+      const { apiUrlInterpret } = this.props
+
+      fetch(apiUrlInterpret(inputs), {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(inputs)
+      }).then((response) => {
+        return response.json();
+      }).then((json) => {
+        console.log(json)
+        this.setState({interpretData: json})
+      })
+    }
+
     render() {
         const { title, description, descriptionEllipsed, examples, fields, selectedModel, vertical, Output } = this.props;
         const { requestData, responseData, outputState } = this.state;
@@ -65,7 +86,7 @@ class Model extends React.Component {
                                      outputState={outputState}
                                      runModel={this.runModel}/>
 
-        const demoOutput = requestData && responseData ? <Output {...this.state}/> : null
+        const demoOutput = requestData && responseData ? <Output {...this.state} interpretModel={this.interpretModel} /> : null
 
         let className, InputPane, OutputPane
         if (vertical) {

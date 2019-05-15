@@ -1,5 +1,6 @@
 import React from 'react';
 import HeatMap from '../HeatMap'
+import TextSaliencyMap from '../Interpretation'
 import { withRouter } from 'react-router-dom';
 import {
   Accordion,
@@ -131,11 +132,24 @@ const ArithmeticEquation = ({numbers}) => {
   return null;
 }
 
-const AnswerByType = ({requestData, responseData}) => {
+const AnswerByType = ({requestData, responseData, interpretModel, interpretData}) => {
   if(requestData && responseData) {
     const { passage, question } = requestData;
-    const { answer } = responseData;
+    const { answer, question_tokens, passage_tokens } = responseData;
     const { answer_type } = answer || {};
+    const { grad_input_1, grad_input_2 } = interpretData ? interpretData : {grad_input_1: [], grad_input_2: []}
+    const questionGrads = grad_input_2
+    const passageGrads = grad_input_1
+
+    const questionTokensWithWeights = questionGrads.length !== 0 ? question_tokens.map((token, idx) => {
+      let weight = questionGrads[idx]
+      return {token, weight}
+    }) : []
+  
+    const passageTokensWithWeights = passageGrads.length !== 0 ? passage_tokens.map((token, idx) => {
+      let weight = passageGrads[idx]
+      return {token, weight}
+    }) : []
 
     switch(answer_type) {
       case "passage_span": {
@@ -163,6 +177,15 @@ const AnswerByType = ({requestData, responseData}) => {
               </OutputField>
 
               <Attention {...responseData}/>
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+              </button>
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
+
             </section>
           )
         }
@@ -282,6 +305,14 @@ const AnswerByType = ({requestData, responseData}) => {
               </OutputField>
 
               <Attention {...responseData}/>
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+              </button>
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
             </section>
           )
         }
@@ -453,6 +484,12 @@ const apiUrl = ({model}) => {
   return `${API_ROOT}/predict/${endpoint}`
 }
 
-const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output}
+const apiUrlInterpret = ({model}) => {
+  const selectedModel = model || (taskModels[0] && taskModels[0].name);
+  const endpoint = taskEndpoints[selectedModel]
+  return `${API_ROOT}/interpret/${endpoint}`
+}
+
+const modelProps = {apiUrl, apiUrlInterpret, title, description, descriptionEllipsed, fields, examples, Output}
 
 export default withRouter(props => <Model {...props} {...modelProps}/>)
