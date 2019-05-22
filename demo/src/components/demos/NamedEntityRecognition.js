@@ -5,6 +5,7 @@ import HighlightContainer from '../highlight/HighlightContainer';
 import { Highlight } from '../highlight/Highlight';
 import Model from '../Model'
 import { truncateText } from '../DemoInput'
+import TextSaliencyMap from '../Interpretation'
 
 // LOC, PER, ORG, MISC
 
@@ -166,8 +167,11 @@ const TokenSpan = ({ token }) => {
     }
 }
 
-const Output = ({ responseData }) => {
+const Output = ({ responseData, requestData, interpretModel, interpretData }) => {
     const { words, tags } = responseData
+    console.log(words)
+    console.log("INTERPRET DATA", interpretData)
+    interpretData = interpretData || []
 
     // "B" = "Beginning" (first token in a sequence of tokens comprising an entity)
     // "I" = "Inside" (token in a sequence of tokens (that isn't first or last in its sequence) comprising an entity)
@@ -224,6 +228,22 @@ const Output = ({ responseData }) => {
           <HighlightContainer layout="bottom-labels">
             {formattedTokens.map((token, i) => <TokenSpan key={i} token={token} />)}
           </HighlightContainer>
+          <button
+            type="button"
+            className="btn"
+            style={{margin: "30px 0px"}}
+            onClick={ () => interpretModel(requestData) }>Interpret Prediction
+          </button>
+          {interpretData.map((el) => {
+            const grad = el['grad_input_1']
+            const sentenceTokensWithWeights = grad.length !== 0 ? words.map((token, idx) => {
+              let weight = grad[idx]
+              return {token, weight}
+            }) : []
+            console.log('tokens with weights', sentenceTokensWithWeights)
+            return <div><TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} /><br /></div>
+          })
+          }
         </div>
       </div>
     )
@@ -244,6 +264,12 @@ const apiUrl = ({model}) => {
     return `${API_ROOT}/predict/${endpoint}`
 }
 
-const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output}
+const apiUrlInterpret = ({model}) => {
+  const selectedModel = model || (taskModels[0] && taskModels[0].name);
+  const endpoint = taskEndpoints[selectedModel]
+  return `${API_ROOT}/interpret/${endpoint}`
+}
+
+const modelProps = {apiUrl, apiUrlInterpret, title, description, descriptionEllipsed, fields, examples, Output}
 
 export default withRouter(props => <Model {...props} {...modelProps}/>)
