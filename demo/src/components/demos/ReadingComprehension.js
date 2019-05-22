@@ -217,6 +217,14 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+              </button>
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
             </section>
           )
         }
@@ -245,6 +253,14 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+              </button>
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
             </section>
           )
         }
@@ -276,6 +292,14 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+              </button>
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
             </section>
           )
         }
