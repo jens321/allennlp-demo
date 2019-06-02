@@ -20,6 +20,7 @@ class Model extends React.Component {
     }
 
     runModel(inputs) {
+      console.log('inputs', inputs)
       const { selectedModel, apiUrl } = this.props
 
       this.setState({outputState: "working"});

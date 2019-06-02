@@ -132,24 +132,66 @@ const ArithmeticEquation = ({numbers}) => {
   return null;
 }
 
+const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passage_tokens) => {
+  console.log("sakdjflkja;slkdjf", questionGrads, passageGrads)
+  // map to objects with indices
+  let questionGradsWithIdx = questionGrads.map((grad, idx) => { return {grad, idx} })
+  console.log('question GRADS', questionGradsWithIdx)
+  let passageGradsWithIdx = passageGrads.map((grad, idx) => { return {grad, idx} })
+  console.log('passage GRADS', passageGradsWithIdx)
+
+  function grad_compare(obj1, obj2) {
+    return obj2.grad - obj1.grad
+  }
+
+  // sort and take top-k
+  const topKQuestionGrads = questionGradsWithIdx.sort(grad_compare).slice(0, 3)
+  console.log('TOPK QUESTION GRADS', topKQuestionGrads)
+  const topKPassageGrads = passageGradsWithIdx.sort(grad_compare).slice(0, 13)
+  console.log('TOPK PASSAGE GRADS', topKPassageGrads)
+
+  // Store set of weights we want to visualize
+  const validQuestionGrads = new Set(topKQuestionGrads.map((el) => el.idx))
+  const validPassageGrads = new Set(topKPassageGrads.map((el) => el.idx))
+
+  // We do 1 - weight to get the colormap scaling right
+  const questionTokensWithWeights = question_tokens.map((token, idx) => {
+    if (validQuestionGrads.has(idx)) {
+      let weight = questionGrads[idx]
+      return {token, weight: 1 - weight}
+    } else {
+      return {token, weight: undefined}
+    }
+  })
+
+  // We do 1 - weight to get the colormap scaling right
+  const passageTokensWithWeights = passage_tokens.map((token, idx) => {
+    if (validPassageGrads.has(idx)) {
+      let weight = passageGrads[idx]
+      return {token, weight: 1 - weight}
+    } else {
+      return {token, weight: undefined}
+    }
+  })
+
+  return [questionTokensWithWeights, passageTokensWithWeights]
+}
+
 const AnswerByType = ({requestData, responseData, interpretModel, interpretData}) => {
   if(requestData && responseData) {
     const { passage, question } = requestData;
     const { answer, question_tokens, passage_tokens } = responseData;
     const { answer_type } = answer || {};
     const { grad_input_1, grad_input_2 } = interpretData ? interpretData : {grad_input_1: [], grad_input_2: []}
-    const questionGrads = grad_input_2
-    const passageGrads = grad_input_1
 
-    const questionTokensWithWeights = questionGrads.length !== 0 ? question_tokens.map((token, idx) => {
-      let weight = questionGrads[idx]
-      return {token, weight}
-    }) : []
-  
-    const passageTokensWithWeights = passageGrads.length !== 0 ? passage_tokens.map((token, idx) => {
-      let weight = passageGrads[idx]
-      return {token, weight}
-    }) : []
+    let questionTokensWithWeights = []
+    let passageTokensWithWeights = []
+
+    if (grad_input_1.length !== 0 && grad_input_2.length !== 0) {
+      let output = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens)
+      questionTokensWithWeights = output[0]
+      passageTokensWithWeights = output[1]
+    }  
 
     switch(answer_type) {
       case "passage_span": {
@@ -183,8 +225,12 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
                 style={{margin: "30px 0px"}}
                 onClick={ () => interpretModel(requestData) }>Interpret Prediction
               </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} />
 
             </section>
           )
@@ -223,8 +269,12 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
                 style={{margin: "30px 0px"}}
                 onClick={ () => interpretModel(requestData) }>Interpret Prediction
               </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} />
             </section>
           )
         }
@@ -259,8 +309,12 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
                 style={{margin: "30px 0px"}}
                 onClick={ () => interpretModel(requestData) }>Interpret Prediction
               </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} />
             </section>
           )
         }
@@ -298,8 +352,12 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
                 style={{margin: "30px 0px"}}
                 onClick={ () => interpretModel(requestData) }>Interpret Prediction
               </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} />
             </section>
           )
         }
@@ -335,8 +393,12 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
                 style={{margin: "30px 0px"}}
                 onClick={ () => interpretModel(requestData) }>Interpret Prediction
               </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} />
+              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} /><br />
+              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} />
             </section>
           )
         }
