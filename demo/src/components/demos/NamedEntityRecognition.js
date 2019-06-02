@@ -238,10 +238,14 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
             const grad = el['grad_input_1']
             const sentenceTokensWithWeights = grad.length !== 0 ? words.map((token, idx) => {
               let weight = grad[idx]
-              return {token, weight}
+              return {token, weight: 1 - weight}
             }) : []
             console.log('tokens with weights', sentenceTokensWithWeights)
-            return <div><TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} /><br /></div>
+            return <div><TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} colormapProps={{
+              colormap: 'copper',
+              format: 'hex',
+              nshades: 20
+            }} /><br /></div>
           })
           }
         </div>

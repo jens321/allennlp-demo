@@ -54,7 +54,9 @@ class TextSaliencyMap extends React.Component {
     let result_string = [];
     tokensWithWeights.forEach((obj, idx) => {
       result_string.push(
-        <ColorizedToken backgroundColor={obj.weight ? colors[Math.round(obj.weight * (colormapProps.nshades - 1))] : 'transparent'}
+        // IMPORTANT: * the colormap pictures for colormap js go from left to right!
+        //            * This means that for RdBu, low extreme is blue and high extreme is red 
+        <ColorizedToken backgroundColor={typeof obj.weight !== undefined ? colors[Math.round(obj.weight * (colormapProps.nshades - 1))] : 'transparent'}
                         key={idx}>{obj.token}
         </ColorizedToken>
       )

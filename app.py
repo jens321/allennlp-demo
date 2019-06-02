@@ -12,6 +12,7 @@ import os
 import sys
 import time
 from functools import lru_cache
+from collections import defaultdict 
 
 from flask import Flask, request, Response, jsonify, send_file, send_from_directory
 from flask_cors import CORS
@@ -24,6 +25,7 @@ import pytz
 
 from allennlp.common.util import JsonDict, peak_memory_mb
 from allennlp.predictors import Predictor
+from allennlp.interpretation import Interpreter
 
 from server.permalinks import int_to_slug, slug_to_int
 from server.db import DemoDatabase, PostgresDemoDatabase
@@ -96,14 +98,18 @@ def make_app(build_dir: str = None,
     start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S %Z")
 
     app.predictors = {}
+    app.interpreters = defaultdict(dict)
     app.max_request_lengths = {}
     app.wsgi_app = ProxyFix(app.wsgi_app) # sets the requester IP with the X-Forwarded-For header
 
     for name, demo_model in models.items():
         if name == 'textual-entailment':
+            # or name == 'textual-entailment' or name == 'machine-comprehension' or name == 'naqanet-reading-comprehension':
             logger.info(f"loading {name} model")
             predictor = demo_model.predictor()
+            simple_gradients_interpreter = Interpreter.by_name('simple-gradients-interpreter')(predictor)
             app.predictors[name] = predictor
+            app.interpreters[name]['simple-gradients-interpreter'] = simple_gradients_interpreter
             app.max_request_lengths[name] = demo_model.max_request_length
 
     @app.errorhandler(ServerError)
@@ -170,7 +176,7 @@ def make_app(build_dir: str = None,
         if request.method == "OPTIONS":
             return Response(response="", status=200)
         lowered_model_name = model_name.lower()
-        model = app.predictors.get(lowered_model_name)
+        model = app.interpreters.get(lowered_model_name)['simple-gradients-interpreter']
         if model is None:
             raise ServerError("unknown model: {}".format(model_name), status_code=400)
         max_request_length = app.max_request_lengths[lowered_model_name]

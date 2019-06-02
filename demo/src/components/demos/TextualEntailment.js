@@ -78,6 +78,49 @@ const judgments = {
   NEUTRAL: <span>there is <strong>no correlation</strong> between the premise and hypothesis</span>
 }
 
+const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens) => {
+  console.log("sakdjflkja;slkdjf", premiseGrads, hypothesisGrads)
+  // map to objects with indices
+  let premiseGradsWithIdx = premiseGrads.map((grad, idx) => { return {grad, idx} })
+  console.log('PREMISE GRADS', premiseGradsWithIdx)
+  let hypothesisGradsWithIdx = hypothesisGrads.map((grad, idx) => { return {grad, idx} })
+
+  function grad_compare(obj1, obj2) {
+    return obj2.grad - obj1.grad
+  }
+
+  // sort and take top-k
+  const topKPremiseGrads = premiseGradsWithIdx.sort(grad_compare).slice(0, 3)
+  console.log('TOPK PREMISE GRADS', topKPremiseGrads)
+  const topKHypothesisGrads = hypothesisGradsWithIdx.sort(grad_compare).slice(0, 3)
+
+  // Store set of weights we want to visualize
+  const validPremiseGrads = new Set(topKPremiseGrads.map((el) => el.idx))
+  const validHypothesisGrads = new Set(topKHypothesisGrads.map((el) => el.idx))
+
+  // We do 1 - weight to get the colormap scaling right
+  const premiseTokensWithWeights = premise_tokens.map((token, idx) => {
+    if (validPremiseGrads.has(idx)) {
+      let weight = premiseGrads[idx]
+      return {token, weight: 1 - weight}
+    } else {
+      return {token, weight: undefined}
+    }
+  })
+
+  // We do 1 - weight to get the colormap scaling right
+  const hypothesisTokensWithWeights = hypothesis_tokens.map((token, idx) => {
+    if (validHypothesisGrads.has(idx)) {
+      let weight = hypothesisGrads[idx]
+      return {token, weight: 1 - weight}
+    } else {
+      return {token, weight: undefined}
+    }
+  })
+
+  return [premiseTokensWithWeights, hypothesisTokensWithWeights]
+}
+
 const Output = ({ requestData, responseData, interpretData, interpretModel }) => {
   const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
   const { grad_input_1, grad_input_2 } = interpretData ? interpretData : {grad_input_1: [], grad_input_2: []}
@@ -86,18 +129,17 @@ const Output = ({ requestData, responseData, interpretData, interpretModel }) =>
   
   // request data contains {premise: "...", hypothesis: "..."} just as we would expect 
 
-  const premiseGrads = grad_input_2
-  const hypothesisGrads = grad_input_1
+  let premiseTokensWithWeights = []
+  let hypothesisTokensWithWeights = []
 
-  const premiseTokensWithWeights = premiseGrads.length !== 0 ? premise_tokens.map((token, idx) => {
-    let weight = premiseGrads[idx]
-    return {token, weight}
-  }) : []
+  if (grad_input_1.length !== 0 && grad_input_2.length !== 0) {
+    let output = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens)
+    premiseTokensWithWeights = output[0]
+    hypothesisTokensWithWeights = output[1]
+  }  
 
-  const hypothesisTokensWithWeights = hypothesisGrads.length !== 0 ? hypothesis_tokens.map((token, idx) => {
-    let weight = hypothesisGrads[idx]
-    return {token, weight}
-  }) : []
+  console.log('premise tokens', premiseTokensWithWeights)
+  console.log('hypothesis tokens', hypothesisTokensWithWeights)
 
   // Find judgment and confidence.
   let judgment
@@ -192,12 +234,14 @@ const Output = ({ requestData, responseData, interpretData, interpretModel }) =>
             <div className="accordion__arrow" role="presentation"/>
           </AccordionItemTitle>
           <AccordionItemBody>
-            <p style={{backgroundColor: "#F6F8F9", padding: "15px", marginBottom: "10px"}}>
-                <strong>Red:</strong> a negative contribution to the prediction <br />
-                <strong>Blue:</strong> a positive contribution to the prediction 
-            </p>
-            <TextSaliencyMap tokensWithWeights={premiseTokensWithWeights} />
-            <TextSaliencyMap tokensWithWeights={hypothesisTokensWithWeights} />
+            <p>Saliency Map for Premise:</p>
+            <TextSaliencyMap tokensWithWeights={premiseTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                          format: 'hex',
+                                                                                          nshades: 20}} />
+            <p>Saliency Map for Hypothesis:</p>
+            <TextSaliencyMap tokensWithWeights={hypothesisTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                            format: 'hex',
+                                                                                            nshades: 20}} />
             <button
               type="button"
               className="btn"
