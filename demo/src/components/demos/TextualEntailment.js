@@ -78,7 +78,7 @@ const judgments = {
   NEUTRAL: <span>there is <strong>no correlation</strong> between the premise and hypothesis</span>
 }
 
-const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens) => {
+const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens, premiseTopK, hypothesisTopK) => {
   console.log("sakdjflkja;slkdjf", premiseGrads, hypothesisGrads)
   // map to objects with indices
   let premiseGradsWithIdx = premiseGrads.map((grad, idx) => { return {grad, idx} })
@@ -90,9 +90,9 @@ const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypo
   }
 
   // sort and take top-k
-  const topKPremiseGrads = premiseGradsWithIdx.sort(grad_compare).slice(0, 3)
+  const topKPremiseGrads = premiseGradsWithIdx.sort(grad_compare).slice(0, premiseTopK)
   console.log('TOPK PREMISE GRADS', topKPremiseGrads)
-  const topKHypothesisGrads = hypothesisGradsWithIdx.sort(grad_compare).slice(0, 3)
+  const topKHypothesisGrads = hypothesisGradsWithIdx.sort(grad_compare).slice(0, hypothesisTopK)
 
   // Store set of weights we want to visualize
   const validPremiseGrads = new Set(topKPremiseGrads.map((el) => el.idx))
@@ -121,166 +121,193 @@ const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypo
   return [premiseTokensWithWeights, hypothesisTokensWithWeights]
 }
 
-const Output = ({ requestData, responseData, interpretData, interpretModel }) => {
-  const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
-  const { instance_1 } = interpretData ? interpretData : { instance_1: { grad_input_1: [], grad_input_2: [] } }
-  const { grad_input_1, grad_input_2 } = instance_1 
+class Output extends React.Component {
+  constructor(props) {
+    super(props)
 
-  const [entailment, contradiction, neutral] = label_probs
-  
-  // request data contains {premise: "...", hypothesis: "..."} just as we would expect 
+    this.state = {
+      premiseTopK: 3,
+      hypothesisTopK: 3  
+    }
 
-  let premiseTokensWithWeights = []
-  let hypothesisTokensWithWeights = []
-
-  if (grad_input_1.length !== 0 && grad_input_2 !== 0) {
-    let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens)
-    premiseTokensWithWeights = tokensWithWeights[0]
-    hypothesisTokensWithWeights = tokensWithWeights[1]
-  }  
-
-  console.log('premise tokens', premiseTokensWithWeights)
-  console.log('hypothesis tokens', hypothesisTokensWithWeights)
-
-  // Find judgment and confidence.
-  let judgment
-  let confidence
-
-  if (entailment > contradiction && entailment > neutral) {
-    judgment = judgments.ENTAILMENT
-    confidence = entailment
-  }
-  else if (contradiction > entailment && contradiction > neutral) {
-    judgment = judgments.CONTRADICTION
-    confidence = contradiction
-  }
-  else if (neutral > entailment && neutral > contradiction) {
-    judgment = judgments.NEUTRAL
-    confidence = neutral
-  } else {
-    throw new Error("cannot form judgment")
+    this.handleTopKChange = fieldName => e => {
+      if (e.target.value.trim() !== "") {
+        console.log(e.target)
+        let stateUpdate = {}
+        stateUpdate[fieldName] = parseInt(e.target.value, 10)
+        this.setState(stateUpdate)
+      }
+    }
   }
 
-  // Create summary text.
-  const veryConfident = 0.75;
-  const somewhatConfident = 0.50;
-  let summaryText
+  render() {
+    const { requestData, responseData, interpretData, interpretModel } = this.props 
+    const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
+    const { instance_1 } = interpretData ? interpretData : { instance_1: { grad_input_1: [], grad_input_2: [] } }
+    const { grad_input_1, grad_input_2 } = instance_1 
 
-  if (confidence >= veryConfident) {
-    summaryText = (
-      <div>
-        It is <strong>very likely</strong> that {judgment}.
-      </div>
-    )
-  } else if (confidence >= somewhatConfident) {
-    summaryText = (
-      <div>
-        It is <strong>somewhat likely</strong> that {judgment}.
-      </div>
-    )
-  } else {
-    summaryText = (
-      <div>The model is not confident in its judgment.</div>
+    const [entailment, contradiction, neutral] = label_probs
+    
+    // request data contains {premise: "...", hypothesis: "..."} just as we would expect 
+
+    let premiseTokensWithWeights = []
+    let hypothesisTokensWithWeights = []
+
+    if (grad_input_1.length !== 0 && grad_input_2 !== 0) {
+      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens, this.state.premiseTopK, this.state.hypothesisTopK)
+      premiseTokensWithWeights = tokensWithWeights[0]
+      hypothesisTokensWithWeights = tokensWithWeights[1]
+    }  
+
+    console.log('premise tokens', premiseTokensWithWeights)
+    console.log('hypothesis tokens', hypothesisTokensWithWeights)
+
+    // Find judgment and confidence.
+    let judgment
+    let confidence
+
+    if (entailment > contradiction && entailment > neutral) {
+      judgment = judgments.ENTAILMENT
+      confidence = entailment
+    }
+    else if (contradiction > entailment && contradiction > neutral) {
+      judgment = judgments.CONTRADICTION
+      confidence = contradiction
+    }
+    else if (neutral > entailment && neutral > contradiction) {
+      judgment = judgments.NEUTRAL
+      confidence = neutral
+    } else {
+      throw new Error("cannot form judgment")
+    }
+
+    // Create summary text.
+    const veryConfident = 0.75;
+    const somewhatConfident = 0.50;
+    let summaryText
+
+    if (confidence >= veryConfident) {
+      summaryText = (
+        <div>
+          It is <strong>very likely</strong> that {judgment}.
+        </div>
       )
-  }
+    } else if (confidence >= somewhatConfident) {
+      summaryText = (
+        <div>
+          It is <strong>somewhat likely</strong> that {judgment}.
+        </div>
+      )
+    } else {
+      summaryText = (
+        <div>The model is not confident in its judgment.</div>
+        )
+    }
 
-  function formatProb(n) {
-    return parseFloat((n * 100).toFixed(1)) + "%";
-  }
+    function formatProb(n) {
+      return parseFloat((n * 100).toFixed(1)) + "%";
+    }
 
-  // https://en.wikipedia.org/wiki/Ternary_plot#Plotting_a_ternary_plot
-  const a = contradiction;
-  const b = neutral;
-  const c = entailment;
-  const x = 0.5 * (2 * b + c) / (a + b + c)
-  const y = (c / (a + b + c))
+    // https://en.wikipedia.org/wiki/Ternary_plot#Plotting_a_ternary_plot
+    const a = contradiction;
+    const b = neutral;
+    const c = entailment;
+    const x = 0.5 * (2 * b + c) / (a + b + c)
+    const y = (c / (a + b + c))
 
-  return (
-  <div className="model__content answer">
-    <OutputField label="Summary">
-    {summaryText}
-    </OutputField>
-    <div className="te-output">
-    <TeGraph x={x} y={y}/>
-    <div className="te-table">
-      <table>
-      <thead>
-        <tr>
-        <th>Judgment</th>
-        <th>Probability</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-        <td>Entailment</td>
-        <td>{formatProb(entailment)}</td>
-        </tr>
-        <tr>
-        <td>Contradiction</td>
-        <td>{formatProb(contradiction)}</td>
-        </tr>
-        <tr>
-        <td>Neutral</td>
-        <td>{formatProb(neutral)}</td>
-        </tr>
-      </tbody>
-      </table>
-    </div>
-    </div>
-    <OutputField label=" Model internals">
-      <Accordion accordion={false}>
-        <AccordionItem expanded={true}>
-          <AccordionItemTitle>
-            Interpretation Visualization
-            <div className="accordion__arrow" role="presentation"/>
-          </AccordionItemTitle>
-          <AccordionItemBody>
-            <p>Saliency Map for Premise:</p>
-            <TextSaliencyMap tokensWithWeights={premiseTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} />
-            <p>Saliency Map for Hypothesis:</p>
-            <TextSaliencyMap tokensWithWeights={hypothesisTokensWithWeights} colormapProps={{colormap: 'copper',
+    return (
+    <div className="model__content answer">
+      <OutputField label="Summary">
+      {summaryText}
+      </OutputField>
+      <div className="te-output">
+      <TeGraph x={x} y={y}/>
+      <div className="te-table">
+        <table>
+        <thead>
+          <tr>
+          <th>Judgment</th>
+          <th>Probability</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+          <td>Entailment</td>
+          <td>{formatProb(entailment)}</td>
+          </tr>
+          <tr>
+          <td>Contradiction</td>
+          <td>{formatProb(contradiction)}</td>
+          </tr>
+          <tr>
+          <td>Neutral</td>
+          <td>{formatProb(neutral)}</td>
+          </tr>
+        </tbody>
+        </table>
+      </div>
+      </div>
+      <OutputField label=" Model internals">
+        <Accordion accordion={false}>
+          <AccordionItem expanded={true}>
+            <AccordionItemTitle>
+              Interpretation Visualization
+              <div className="accordion__arrow" role="presentation"/>
+            </AccordionItemTitle>
+            <AccordionItemBody>
+              <br />
+              <strong>Top K gradients (premise):</strong> <input type="text" value={this.state.premiseTopK} onChange={this.handleTopKChange('premiseTopK')}/><br />
+              <strong>Top K gradients (hypothesis):</strong> <input type="text" value={this.state.hypothesisTopK} onChange={this.handleTopKChange('hypothesisTopK')}/> 
+              <br />
+              <p><strong>Saliency Map for Premise:</strong></p>
+              {premiseTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={premiseTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                             format: 'hex',
-                                                                                            nshades: 20}} />
-            <button
-              type="button"
-              className="btn"
-              style={{margin: "30px 0px"}}
-              onClick={ () => interpretModel(requestData) }>Interpret Prediction
-            </button>
-          </AccordionItemBody>
-        </AccordionItem>
-        <AccordionItem expanded={true}>
-          <AccordionItemTitle>
-            Premise to Hypothesis Attention
-            <div className="accordion__arrow" role="presentation"/>
-          </AccordionItemTitle>
-          <AccordionItemBody>
-            <p>
-                For every premise word, the model computes an attention over the hypothesis words.
+                                                                                            nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show premise interpretation</p>}
+                                                                                           
+              <p><strong>Saliency Map for Hypothesis:</strong></p>
+              {hypothesisTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={hypothesisTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                              format: 'hex',
+                                                                                              nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show hypothesis interpretation</p>}
+                                                                                              
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+              </button>
+            </AccordionItemBody>
+          </AccordionItem>
+          <AccordionItem expanded={true}>
+            <AccordionItemTitle>
+              Premise to Hypothesis Attention
+              <div className="accordion__arrow" role="presentation"/>
+            </AccordionItemTitle>
+            <AccordionItemBody>
+              <p>
+                  For every premise word, the model computes an attention over the hypothesis words.
+                  This heatmap shows that attention, which is normalized for every row in the matrix.
+              </p>
+              <HeatMap colLabels={premise_tokens} rowLabels={hypothesis_tokens} data={h2p_attention} />
+            </AccordionItemBody>
+          </AccordionItem>
+          <AccordionItem>
+            <AccordionItemTitle>
+              Hypothesis to Premise Attention
+              <div className="accordion__arrow" role="presentation"/>
+            </AccordionItemTitle>
+            <AccordionItemBody>
+              <p>
+                For every hypothesis word, the model computes an attention over the premise words.
                 This heatmap shows that attention, which is normalized for every row in the matrix.
-            </p>
-            <HeatMap colLabels={premise_tokens} rowLabels={hypothesis_tokens} data={h2p_attention} />
-          </AccordionItemBody>
-        </AccordionItem>
-        <AccordionItem>
-          <AccordionItemTitle>
-            Hypothesis to Premise Attention
-            <div className="accordion__arrow" role="presentation"/>
-          </AccordionItemTitle>
-          <AccordionItemBody>
-            <p>
-              For every hypothesis word, the model computes an attention over the premise words.
-              This heatmap shows that attention, which is normalized for every row in the matrix.
-            </p>
-            <HeatMap colLabels={hypothesis_tokens} rowLabels={premise_tokens} data={p2h_attention} />
-          </AccordionItemBody>
-        </AccordionItem>
-      </Accordion>
-    </OutputField>
-  </div>
-  );
+              </p>
+              <HeatMap colLabels={hypothesis_tokens} rowLabels={premise_tokens} data={p2h_attention} />
+            </AccordionItemBody>
+          </AccordionItem>
+        </Accordion>
+      </OutputField>
+    </div>
+    );
+  }
 }
 
 const examples = [
