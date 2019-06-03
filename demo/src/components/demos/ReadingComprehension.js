@@ -182,15 +182,17 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
     const { passage, question } = requestData;
     const { answer, question_tokens, passage_tokens } = responseData;
     const { answer_type } = answer || {};
-    const { grad_input_1, grad_input_2 } = interpretData ? interpretData : {grad_input_1: [], grad_input_2: []}
+
+    const { instance_1 } = interpretData ? interpretData : { instance_1: { grad_input_1: [], grad_input_2: [] } }
+    const { grad_input_1, grad_input_2 } = instance_1
 
     let questionTokensWithWeights = []
     let passageTokensWithWeights = []
 
     if (grad_input_1.length !== 0 && grad_input_2.length !== 0) {
-      let output = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens)
-      questionTokensWithWeights = output[0]
-      passageTokensWithWeights = output[1]
+      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens)
+      questionTokensWithWeights = tokensWithWeights[0]
+      passageTokensWithWeights = tokensWithWeights[1]
     }  
 
     switch(answer_type) {

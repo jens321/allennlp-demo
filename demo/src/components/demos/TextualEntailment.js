@@ -123,7 +123,8 @@ const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypo
 
 const Output = ({ requestData, responseData, interpretData, interpretModel }) => {
   const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
-  const { grad_input_1, grad_input_2 } = interpretData ? interpretData : {grad_input_1: [], grad_input_2: []}
+  const { instance_1 } = interpretData ? interpretData : { instance_1: { grad_input_1: [], grad_input_2: [] } }
+  const { grad_input_1, grad_input_2 } = instance_1 
 
   const [entailment, contradiction, neutral] = label_probs
   
@@ -132,10 +133,10 @@ const Output = ({ requestData, responseData, interpretData, interpretModel }) =>
   let premiseTokensWithWeights = []
   let hypothesisTokensWithWeights = []
 
-  if (grad_input_1.length !== 0 && grad_input_2.length !== 0) {
-    let output = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens)
-    premiseTokensWithWeights = output[0]
-    hypothesisTokensWithWeights = output[1]
+  if (grad_input_1.length !== 0 && grad_input_2 !== 0) {
+    let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens)
+    premiseTokensWithWeights = tokensWithWeights[0]
+    hypothesisTokensWithWeights = tokensWithWeights[1]
   }  
 
   console.log('premise tokens', premiseTokensWithWeights)

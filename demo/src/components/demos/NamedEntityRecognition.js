@@ -167,11 +167,41 @@ const TokenSpan = ({ token }) => {
     }
 }
 
+const generateSaliencyMaps = (interpretData, words) => {
+  let saliencyMaps = []
+
+  // NOTE: javascript object properties order is not guaranteed
+  //       which is why we iterate by key indices 
+  let size = Object.keys(interpretData).length  
+  for (let i = 1; i <= size; ++i) {
+    let cur_grad = interpretData['instance_' + i.toString()]['grad_input_1']
+    const sentenceTokensWithWeights = words.map((token, idx) => {
+      let weight = cur_grad[idx]
+      return {token, weight: 1 - weight}
+    })
+    saliencyMaps.push(
+    <div key={i}>
+      <TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} colormapProps={{ colormap: 'copper',
+                                                                                      format: 'hex',
+                                                                                      nshades: 20
+                                                                                    }} />
+      <br />
+    </div>)
+  }
+
+  return saliencyMaps 
+}
+
 const Output = ({ responseData, requestData, interpretModel, interpretData }) => {
     const { words, tags } = responseData
     console.log(words)
     console.log("INTERPRET DATA", interpretData)
     interpretData = interpretData || []
+
+    let saliencyMaps = []
+    if (interpretData.length !== 0) {
+      saliencyMaps = generateSaliencyMaps(interpretData, words)
+    }
 
     // "B" = "Beginning" (first token in a sequence of tokens comprising an entity)
     // "I" = "Inside" (token in a sequence of tokens (that isn't first or last in its sequence) comprising an entity)
@@ -234,20 +264,7 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
             style={{margin: "30px 0px"}}
             onClick={ () => interpretModel(requestData) }>Interpret Prediction
           </button>
-          {interpretData.map((el) => {
-            const grad = el['grad_input_1']
-            const sentenceTokensWithWeights = grad.length !== 0 ? words.map((token, idx) => {
-              let weight = grad[idx]
-              return {token, weight: 1 - weight}
-            }) : []
-            console.log('tokens with weights', sentenceTokensWithWeights)
-            return <div><TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} colormapProps={{
-              colormap: 'copper',
-              format: 'hex',
-              nshades: 20
-            }} /><br /></div>
-          })
-          }
+          {saliencyMaps}
         </div>
       </div>
     )

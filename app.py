@@ -103,8 +103,8 @@ def make_app(build_dir: str = None,
     app.wsgi_app = ProxyFix(app.wsgi_app) # sets the requester IP with the X-Forwarded-For header
 
     for name, demo_model in models.items():
-        if name == 'textual-entailment':
-            # or name == 'textual-entailment' or name == 'machine-comprehension' or name == 'naqanet-reading-comprehension':
+        if name == 'named-entity-recognition' or name == 'machine-comprehension'\
+            or name == 'naqanet-reading-comprehension' or name == 'textual-entailment':
             logger.info(f"loading {name} model")
             predictor = demo_model.predictor()
             simple_gradients_interpreter = Interpreter.by_name('simple-gradients-interpreter')(predictor)
