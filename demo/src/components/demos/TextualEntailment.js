@@ -18,6 +18,10 @@ const apiUrlInterpret = ({interpreter}) => `${API_ROOT}/interpret/textual-entail
 
 const title = "Textual Entailment"
 
+// Interpreters
+const IG_INTERPRETER = 'integrated_gradients_interpreter'
+const GRAD_INTERPRETER = 'simple_gradients_interpreter'
+
 const description = (
   <span>
     <span>
@@ -81,7 +85,7 @@ const judgments = {
 const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens, premiseTopK, hypothesisTopK) => {
   // map to objects with indices
   let premiseGradsWithIdx = premiseGrads.map((grad, idx) => { return {grad, idx} })
-  console.log('PREMISE GRADS', premiseGradsWithIdx)
+  console.log('PREMISE GRADS', Object.assign({}, premiseGradsWithIdx))
   let hypothesisGradsWithIdx = hypothesisGrads.map((grad, idx) => { return {grad, idx} })
 
   function grad_compare(obj1, obj2) {
@@ -149,7 +153,7 @@ class Output extends React.Component {
     const { requestData, responseData, interpretData, interpretModel } = this.props 
     const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
 
-    const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {'simple_gradients_interpreter': undefined, 'integrated_gradients_interpreter': undefined} 
+    const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {[GRAD_INTERPRETER]: undefined, [IG_INTERPRETER]: undefined} 
   
     let gradientPremiseTokensWithWeights = []
     let gradientHypothesisTokensWithWeights = []
@@ -295,7 +299,7 @@ class Output extends React.Component {
                 type="button"
                 className="btn"
                 style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData, 'simple_gradients_interpreter') }>Interpret Prediction
+                onClick={ () => interpretModel(requestData, GRAD_INTERPRETER) }>Interpret Prediction
               </button>
             </AccordionItemBody>
           </AccordionItem>
@@ -327,7 +331,7 @@ class Output extends React.Component {
                 type="button"
                 className="btn"
                 style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData, 'integrated_gradients_interpreter') }>Interpret Prediction
+                onClick={ () => interpretModel(requestData, IG_INTERPRETER) }>Interpret Prediction
               </button>
             </AccordionItemBody>
           </AccordionItem>

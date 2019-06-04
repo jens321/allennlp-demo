@@ -15,6 +15,10 @@ import { truncateText } from '../DemoInput'
 
 const title = "Reading Comprehension"
 
+// Interpreters
+const IG_INTERPRETER = 'integrated_gradients_interpreter'
+const GRAD_INTERPRETER = 'simple_gradients_interpreter'
+
 const description = (
   <span>
     Reading comprehension is the task of answering questions about a passage of text to show that
@@ -132,7 +136,78 @@ const ArithmeticEquation = ({numbers}) => {
   return null;
 }
 
-const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passage_tokens) => {
+const generateInterpretation = (requestData, 
+                                interpretModel, 
+                                gradientPassageTokensWithWeights,
+                                gradientQuestionTokensWithWeights,
+                                igPassageTokensWithWeights,
+                                igQuestionTokensWithWeights,
+                                integratedGradients,
+                                simpleGradients,
+                                handleTopKChange) => {
+
+  return (
+    <OutputField label="Interpretation">
+      <Accordion accordion={false}>
+        {/* ************************** */}
+        {/* SIMPLE GRADIENTS COMPONENT */}
+        {/* ************************** */}
+        <AccordionItem expanded={true}>
+          <AccordionItemTitle>
+            Simple Gradients Interpretation Visualization
+            <div className="accordion__arrow" role="presentation"/>
+          </AccordionItemTitle>
+          <AccordionItemBody>
+            <br />
+            <strong>Top K gradients (Passage):</strong> <input type="text" value={simpleGradients.passageTopK} onChange={handleTopKChange('passageTopK', 'simpleGradients')}/><br />  
+            <strong>Top K gradients (Question):</strong> <input type="text" value={simpleGradients.questionTopK} onChange={handleTopKChange('questionTopK', 'simpleGradients')}/><br />  
+            <TextSaliencyMap tokensWithWeights={gradientPassageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                        format: 'hex',
+                                                                                        nshades: 20}} /><br />
+            <TextSaliencyMap tokensWithWeights={gradientQuestionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                              format: 'hex',
+                                                                                              nshades: 20}} />
+            <button
+              type="button"
+              className="btn"
+              style={{margin: "30px 0px"}}
+              onClick={ () => interpretModel(requestData, GRAD_INTERPRETER) }>Interpret Prediction
+            </button>
+          </AccordionItemBody>
+        </AccordionItem>
+
+        {/* ****************************** */}
+        {/* INTEGRATED GRADIENTS COMPONENT */}
+        {/* ****************************** */}
+        <AccordionItem expanded={false}>
+          <AccordionItemTitle>
+              Integrated Gradients Interpretation Visualization
+              <div className="accordion__arrow" role="presentation"/>
+            </AccordionItemTitle>
+            <AccordionItemBody>
+            <br />
+            <strong>Top K gradients (Passage):</strong> <input type="text" value={integratedGradients.passageTopK} onChange={handleTopKChange('passageTopK', 'integratedGradients')}/><br />  
+            <strong>Top K gradients (Question):</strong> <input type="text" value={integratedGradients.questionTopK} onChange={handleTopKChange('questionTopK', 'integratedGradients')}/><br />  
+            <TextSaliencyMap tokensWithWeights={igPassageTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                        format: 'hex',
+                                                                                        nshades: 20}} /><br />
+            <TextSaliencyMap tokensWithWeights={igQuestionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                              format: 'hex',
+                                                                                              nshades: 20}} />
+            <button
+              type="button"
+              className="btn"
+              style={{margin: "30px 0px"}}
+              onClick={ () => interpretModel(requestData, IG_INTERPRETER) }>Interpret Prediction
+            </button>
+          </AccordionItemBody>
+        </AccordionItem>
+      </Accordion>
+    </OutputField>
+  )
+}
+
+const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passage_tokens, questionTopK, passageTopK) => {
   console.log("sakdjflkja;slkdjf", questionGrads, passageGrads)
   // map to objects with indices
   let questionGradsWithIdx = questionGrads.map((grad, idx) => { return {grad, idx} })
@@ -145,9 +220,9 @@ const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passa
   }
 
   // sort and take top-k
-  const topKQuestionGrads = questionGradsWithIdx.sort(grad_compare).slice(0, 3)
+  const topKQuestionGrads = questionGradsWithIdx.sort(grad_compare).slice(0, questionTopK)
   console.log('TOPK QUESTION GRADS', topKQuestionGrads)
-  const topKPassageGrads = passageGradsWithIdx.sort(grad_compare).slice(0, 13)
+  const topKPassageGrads = passageGradsWithIdx.sort(grad_compare).slice(0, passageTopK)
   console.log('TOPK PASSAGE GRADS', topKPassageGrads)
 
   // Store set of weights we want to visualize
@@ -177,23 +252,47 @@ const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passa
   return [questionTokensWithWeights, passageTokensWithWeights]
 }
 
-const AnswerByType = ({requestData, responseData, interpretModel, interpretData}) => {
+const AnswerByType = ({requestData, responseData, interpretModel, interpretData, integratedGradients, simpleGradients, handleTopKChange}) => {
   if(requestData && responseData) {
     const { passage, question } = requestData;
     const { answer, question_tokens, passage_tokens } = responseData;
     const { answer_type } = answer || {};
 
-    const { instance_1 } = interpretData ? interpretData : { instance_1: { grad_input_1: [], grad_input_2: [] } }
-    const { grad_input_1, grad_input_2 } = instance_1
+    const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {[GRAD_INTERPRETER]: undefined, [IG_INTERPRETER]: undefined} 
 
-    let questionTokensWithWeights = []
-    let passageTokensWithWeights = []
+    let gradientQuestionTokensWithWeights = []
+    let gradientPassageTokensWithWeights = []
 
-    if (grad_input_1.length !== 0 && grad_input_2.length !== 0) {
-      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens)
-      questionTokensWithWeights = tokensWithWeights[0]
-      passageTokensWithWeights = tokensWithWeights[1]
-    }  
+    let igQuestionTokensWithWeights = []
+    let igPassageTokensWithWeights = []
+
+    if (simple_gradients_interpreter) {
+      const { instance_1 } = simple_gradients_interpreter
+      const { grad_input_1, grad_input_2 } = instance_1
+
+      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens, simpleGradients.questionTopK, simpleGradients.passageTopK)
+      gradientQuestionTokensWithWeights = tokensWithWeights[0]
+      gradientPassageTokensWithWeights = tokensWithWeights[1] 
+    } 
+
+    if (integrated_gradients_interpreter) {
+      const { instance_1 } = integrated_gradients_interpreter
+      const { grad_input_1, grad_input_2 } = instance_1
+
+      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens, integratedGradients.questionTopK, integratedGradients.passageTopK)
+      igQuestionTokensWithWeights = tokensWithWeights[0]
+      igPassageTokensWithWeights = tokensWithWeights[1]
+    }
+
+    const saliencyMaps = generateInterpretation(requestData,
+                                                interpretModel,
+                                                gradientPassageTokensWithWeights,
+                                                gradientQuestionTokensWithWeights,
+                                                igPassageTokensWithWeights,
+                                                igQuestionTokensWithWeights,
+                                                integratedGradients,
+                                                simpleGradients,
+                                                handleTopKChange)
 
     switch(answer_type) {
       case "passage_span": {
@@ -221,18 +320,7 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
-              <button
-                type="button"
-                className="btn"
-                style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData) }>Interpret Prediction
-              </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} />
+              {saliencyMaps}
 
             </section>
           )
@@ -265,18 +353,9 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
-              <button
-                type="button"
-                className="btn"
-                style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData) }>Interpret Prediction
-              </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} />
+
+              {saliencyMaps}
+            
             </section>
           )
         }
@@ -305,18 +384,9 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
-              <button
-                type="button"
-                className="btn"
-                style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData) }>Interpret Prediction
-              </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} />
+              
+              {saliencyMaps}
+
             </section>
           )
         }
@@ -348,18 +418,9 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
-              <button
-                type="button"
-                className="btn"
-                style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData) }>Interpret Prediction
-              </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} />
+              
+              {saliencyMaps}
+
             </section>
           )
         }
@@ -389,18 +450,9 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
               </OutputField>
 
               <Attention {...responseData}/>
-              <button
-                type="button"
-                className="btn"
-                style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData) }>Interpret Prediction
-              </button>
-              <TextSaliencyMap tokensWithWeights={passageTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} /><br />
-              <TextSaliencyMap tokensWithWeights={questionTokensWithWeights} colormapProps={{colormap: 'copper',
-                                                                                          format: 'hex',
-                                                                                          nshades: 20}} />
+              
+              {saliencyMaps}
+              
             </section>
           )
         }
@@ -411,12 +463,38 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData}
   return NoAnswer();
 }
 
-const Output = (props) => {
-  return (
-    <div className="model__content answer">
-      <AnswerByType {...props}/>
-    </div>
-  )
+class Output extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      integratedGradients: {
+        passageTopK: 3,
+        questionTopK: 3
+      },
+      simpleGradients: {
+        passageTopK: 3,
+        questionTopK: 3 
+      }
+    }
+
+    this.handleTopKChange = (fieldName, interpreter) => e => {
+      if (e.target.value.trim() !== "") {
+        let stateUpdate = Object.assign({}, this.state)
+        console.log('state update', stateUpdate)
+        stateUpdate[interpreter][fieldName] = parseInt(e.target.value, 10)
+        this.setState(stateUpdate)
+      }
+    }
+  }
+
+  render() {
+    return (
+      <div className="model__content answer">
+        <AnswerByType {...this.props} {...this.state} handleTopKChange={this.handleTopKChange} />
+      </div>
+    )
+  }
 }
 
 const addSnippet = (example) => {
@@ -572,10 +650,10 @@ const apiUrl = ({model}) => {
   return `${API_ROOT}/predict/${endpoint}`
 }
 
-const apiUrlInterpret = ({model}) => {
+const apiUrlInterpret = ({model, interpreter}) => {
   const selectedModel = model || (taskModels[0] && taskModels[0].name);
   const endpoint = taskEndpoints[selectedModel]
-  return `${API_ROOT}/interpret/${endpoint}`
+  return `${API_ROOT}/interpret/${endpoint}/${interpreter}`
 }
 
 const modelProps = {apiUrl, apiUrlInterpret, title, description, descriptionEllipsed, fields, examples, Output}
