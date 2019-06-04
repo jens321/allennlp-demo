@@ -1,6 +1,12 @@
 import React from 'react';
 import { API_ROOT } from '../../api-config';
 import { withRouter } from 'react-router-dom';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionItemTitle,
+  AccordionItemBody,
+} from 'react-accessible-accordion';
 import HighlightContainer from '../highlight/HighlightContainer';
 import { Highlight } from '../highlight/Highlight';
 import Model from '../Model'
@@ -10,6 +16,10 @@ import TextSaliencyMap from '../Interpretation'
 // LOC, PER, ORG, MISC
 
 const title = "Named Entity Recognition";
+
+// Interpreters
+const IG_INTERPRETER = 'integrated_gradients_interpreter'
+const GRAD_INTERPRETER = 'simple_gradients_interpreter'
 
 const description = (
   <span>
@@ -167,14 +177,14 @@ const TokenSpan = ({ token }) => {
     }
 }
 
-const generateSaliencyMaps = (interpretData, words) => {
+const generateSaliencyMaps = (grads, words) => {
   let saliencyMaps = []
 
   // NOTE: javascript object properties order is not guaranteed
   //       which is why we iterate by key indices 
-  let size = Object.keys(interpretData).length  
+  let size = Object.keys(grads).length  
   for (let i = 1; i <= size; ++i) {
-    let cur_grad = interpretData['instance_' + i.toString()]['grad_input_1']
+    let cur_grad = grads['instance_' + i.toString()]['grad_input_1']
     const sentenceTokensWithWeights = words.map((token, idx) => {
       let weight = cur_grad[idx]
       return {token, weight: 1 - weight}
@@ -196,11 +206,16 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
     const { words, tags } = responseData
     console.log(words)
     console.log("INTERPRET DATA", interpretData)
-    interpretData = interpretData || []
+    const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {[GRAD_INTERPRETER]: undefined, [IG_INTERPRETER]: undefined}
 
-    let saliencyMaps = []
-    if (interpretData.length !== 0) {
-      saliencyMaps = generateSaliencyMaps(interpretData, words)
+    let gradientSaliencyMaps
+    let igSaliencyMaps 
+    if (simple_gradients_interpreter) {
+      gradientSaliencyMaps = generateSaliencyMaps(simple_gradients_interpreter, words)
+    }
+
+    if (integrated_gradients_interpreter) {
+      igSaliencyMaps = generateSaliencyMaps(integrated_gradients_interpreter, words)
     }
 
     // "B" = "Beginning" (first token in a sequence of tokens comprising an entity)
@@ -258,13 +273,39 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
           <HighlightContainer layout="bottom-labels">
             {formattedTokens.map((token, i) => <TokenSpan key={i} token={token} />)}
           </HighlightContainer>
-          <button
-            type="button"
-            className="btn"
-            style={{margin: "30px 0px"}}
-            onClick={ () => interpretModel(requestData) }>Interpret Prediction
-          </button>
-          {saliencyMaps}
+            <Accordion accordion={false}>
+              <AccordionItem expanded={false}>
+                <AccordionItemTitle>
+                  Simple Gradients Interpretation
+                  <div className="accordion__arrow" role="presentation"/>
+                </AccordionItemTitle>
+                <AccordionItemBody>
+                  {gradientSaliencyMaps}
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{margin: "30px 0px"}}
+                    onClick={ () => interpretModel(requestData, GRAD_INTERPRETER) }>Interpret Prediction
+                  </button>
+                </AccordionItemBody>
+              </AccordionItem>
+
+              <AccordionItem expanded={false}>
+                <AccordionItemTitle>
+                  Integrated Gradients Interpretation
+                  <div className="accordion__arrow" role="presentation"/>
+                </AccordionItemTitle>
+                <AccordionItemBody>
+                  {igSaliencyMaps}
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{margin: "30px 0px"}}
+                    onClick={ () => interpretModel(requestData, IG_INTERPRETER) }>Interpret Prediction
+                  </button>
+                </AccordionItemBody>
+              </AccordionItem>
+            </Accordion>
         </div>
       </div>
     )
@@ -285,10 +326,10 @@ const apiUrl = ({model}) => {
     return `${API_ROOT}/predict/${endpoint}`
 }
 
-const apiUrlInterpret = ({model}) => {
+const apiUrlInterpret = ({model, interpreter}) => {
   const selectedModel = model || (taskModels[0] && taskModels[0].name);
   const endpoint = taskEndpoints[selectedModel]
-  return `${API_ROOT}/interpret/${endpoint}`
+  return `${API_ROOT}/interpret/${endpoint}/${interpreter}`
 }
 
 const modelProps = {apiUrl, apiUrlInterpret, title, description, descriptionEllipsed, fields, examples, Output}
