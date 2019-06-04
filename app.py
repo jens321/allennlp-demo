@@ -103,13 +103,15 @@ def make_app(build_dir: str = None,
     app.wsgi_app = ProxyFix(app.wsgi_app) # sets the requester IP with the X-Forwarded-For header
 
     for name, demo_model in models.items():
-        if name == 'named-entity-recognition' or name == 'machine-comprehension'\
-            or name == 'naqanet-reading-comprehension' or name == 'textual-entailment':
+        if name == 'textual-entailment': #or name == 'named-entity-recognition':# or name == 'machine-comprehension'\
+            #or name == 'naqanet-reading-comprehension':
             logger.info(f"loading {name} model")
             predictor = demo_model.predictor()
             simple_gradients_interpreter = Interpreter.by_name('simple-gradients-interpreter')(predictor)
+            integrated_gradients_interpreter = Interpreter.by_name('integrated-gradients-interpreter')(predictor)
             app.predictors[name] = predictor
             app.interpreters[name]['simple-gradients-interpreter'] = simple_gradients_interpreter
+            app.interpreters[name]['integrated-gradients-interpreter'] = integrated_gradients_interpreter
             app.max_request_lengths[name] = demo_model.max_request_length
 
     @app.errorhandler(ServerError)
@@ -168,15 +170,23 @@ def make_app(build_dir: str = None,
                 "responseData": permadata.response_data
         })
 
-    @app.route('/interpret/<model_name>', methods=['POST', 'OPTIONS'])
-    def interpret(model_name: str) -> Response: 
+    @app.route('/interpret/<model_name>/<interpreter>', methods=['POST', 'OPTIONS'])
+    def interpret(model_name: str, interpreter: str) -> Response: 
         """
         Interpret prediction of the model
         """
         if request.method == "OPTIONS":
             return Response(response="", status=200)
         lowered_model_name = model_name.lower()
-        model = app.interpreters.get(lowered_model_name)['simple-gradients-interpreter']
+
+
+        if interpreter == 'simple_gradients_interpreter':
+            interpreter = 'simple-gradients-interpreter'
+        elif interpreter == 'integrated_gradients_interpreter':
+            interpreter = 'integrated-gradients-interpreter'
+
+        model = app.interpreters.get(lowered_model_name)[interpreter]
+
         if model is None:
             raise ServerError("unknown model: {}".format(model_name), status_code=400)
         max_request_length = app.max_request_lengths[lowered_model_name]

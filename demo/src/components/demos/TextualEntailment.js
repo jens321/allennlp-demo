@@ -14,7 +14,7 @@ import {
 import '../../css/TeComponent.css';
 
 const apiUrl = () => `${API_ROOT}/predict/textual-entailment`
-const apiUrlInterpret = () => `${API_ROOT}/interpret/textual-entailment`
+const apiUrlInterpret = ({interpreter}) => `${API_ROOT}/interpret/textual-entailment/${interpreter}`
 
 const title = "Textual Entailment"
 
@@ -79,7 +79,6 @@ const judgments = {
 }
 
 const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens, premiseTopK, hypothesisTopK) => {
-  console.log("sakdjflkja;slkdjf", premiseGrads, hypothesisGrads)
   // map to objects with indices
   let premiseGradsWithIdx = premiseGrads.map((grad, idx) => { return {grad, idx} })
   console.log('PREMISE GRADS', premiseGradsWithIdx)
@@ -126,15 +125,21 @@ class Output extends React.Component {
     super(props)
 
     this.state = {
-      premiseTopK: 3,
-      hypothesisTopK: 3  
+      integratedGradients: {
+        premiseTopK: 3,
+        hypothesisTopK: 3
+      },
+      simpleGradients: {
+        premiseTopK: 3,
+        hypothesisTopK: 3 
+      }
     }
 
-    this.handleTopKChange = fieldName => e => {
+    this.handleTopKChange = (fieldName, interpreter) => e => {
       if (e.target.value.trim() !== "") {
-        console.log(e.target)
-        let stateUpdate = {}
-        stateUpdate[fieldName] = parseInt(e.target.value, 10)
+        let stateUpdate = Object.assign({}, this.state)
+        console.log('state update', stateUpdate)
+        stateUpdate[interpreter][fieldName] = parseInt(e.target.value, 10)
         this.setState(stateUpdate)
       }
     }
@@ -143,24 +148,37 @@ class Output extends React.Component {
   render() {
     const { requestData, responseData, interpretData, interpretModel } = this.props 
     const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
-    const { instance_1 } = interpretData ? interpretData : { instance_1: { grad_input_1: [], grad_input_2: [] } }
-    const { grad_input_1, grad_input_2 } = instance_1 
+
+    const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {'simple_gradients_interpreter': undefined, 'integrated_gradients_interpreter': undefined} 
+  
+    let gradientPremiseTokensWithWeights = []
+    let gradientHypothesisTokensWithWeights = []
+
+    let igPremiseTokensWithWeights = []
+    let igHypothesisTokensWithWeights = []
+
+    if (simple_gradients_interpreter) {
+      const { instance_1 } = simple_gradients_interpreter
+      const { grad_input_1, grad_input_2 } = instance_1 
+
+      const tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens, this.state.simpleGradients.premiseTopK, this.state.simpleGradients.hypothesisTopK)
+      gradientPremiseTokensWithWeights = tokensWithWeights[0]
+      gradientHypothesisTokensWithWeights = tokensWithWeights[1]
+    }
+
+    if (integrated_gradients_interpreter) {
+      const { instance_1 } = integrated_gradients_interpreter
+      const { grad_input_1, grad_input_2 } = instance_1 
+
+      const tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens, this.state.integratedGradients.premiseTopK, this.state.integratedGradients.hypothesisTopK)
+      igPremiseTokensWithWeights = tokensWithWeights[0]
+      igHypothesisTokensWithWeights = tokensWithWeights[1]
+    }
+
 
     const [entailment, contradiction, neutral] = label_probs
     
     // request data contains {premise: "...", hypothesis: "..."} just as we would expect 
-
-    let premiseTokensWithWeights = []
-    let hypothesisTokensWithWeights = []
-
-    if (grad_input_1.length !== 0 && grad_input_2 !== 0) {
-      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens, this.state.premiseTopK, this.state.hypothesisTopK)
-      premiseTokensWithWeights = tokensWithWeights[0]
-      hypothesisTokensWithWeights = tokensWithWeights[1]
-    }  
-
-    console.log('premise tokens', premiseTokensWithWeights)
-    console.log('hypothesis tokens', hypothesisTokensWithWeights)
 
     // Find judgment and confidence.
     let judgment
@@ -249,23 +267,27 @@ class Output extends React.Component {
       </div>
       <OutputField label=" Model internals">
         <Accordion accordion={false}>
+
+          {/* ************************** */}
+          {/* SIMPLE GRADIENTS COMPONENT */}
+          {/* ************************** */}
           <AccordionItem expanded={true}>
             <AccordionItemTitle>
-              Interpretation Visualization
+              Simple Gradients Interpretation Visualization
               <div className="accordion__arrow" role="presentation"/>
             </AccordionItemTitle>
             <AccordionItemBody>
               <br />
-              <strong>Top K gradients (premise):</strong> <input type="text" value={this.state.premiseTopK} onChange={this.handleTopKChange('premiseTopK')}/><br />
-              <strong>Top K gradients (hypothesis):</strong> <input type="text" value={this.state.hypothesisTopK} onChange={this.handleTopKChange('hypothesisTopK')}/> 
+              <strong>Top K gradients (premise):</strong> <input type="text" value={this.state.simpleGradients.premiseTopK} onChange={this.handleTopKChange('premiseTopK', 'simpleGradients')}/><br />
+              <strong>Top K gradients (hypothesis):</strong> <input type="text" value={this.state.simpleGradients.hypothesisTopK} onChange={this.handleTopKChange('hypothesisTopK', 'simpleGradients')}/> 
               <br />
               <p><strong>Saliency Map for Premise:</strong></p>
-              {premiseTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={premiseTokensWithWeights} colormapProps={{colormap: 'copper',
+              {gradientPremiseTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={gradientPremiseTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                             format: 'hex',
                                                                                             nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show premise interpretation</p>}
                                                                                            
               <p><strong>Saliency Map for Hypothesis:</strong></p>
-              {hypothesisTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={hypothesisTokensWithWeights} colormapProps={{colormap: 'copper',
+              {gradientHypothesisTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={gradientHypothesisTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                               format: 'hex',
                                                                                               nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show hypothesis interpretation</p>}
                                                                                               
@@ -273,7 +295,39 @@ class Output extends React.Component {
                 type="button"
                 className="btn"
                 style={{margin: "30px 0px"}}
-                onClick={ () => interpretModel(requestData) }>Interpret Prediction
+                onClick={ () => interpretModel(requestData, 'simple_gradients_interpreter') }>Interpret Prediction
+              </button>
+            </AccordionItemBody>
+          </AccordionItem>
+
+          {/* ****************************** */}
+          {/* INTEGRATED GRADIENTS COMPONENT */}
+          {/* ****************************** */}
+          <AccordionItem expanded={true}>
+            <AccordionItemTitle>
+              Integrated Gradients Interpretation Visualization
+              <div className="accordion__arrow" role="presentation"/>
+            </AccordionItemTitle>
+            <AccordionItemBody>
+              <br />
+              <strong>Top K gradients (premise):</strong> <input type="text" value={this.state.integratedGradients.premiseTopK} onChange={this.handleTopKChange('premiseTopK', 'integratedGradients')}/><br />
+              <strong>Top K gradients (hypothesis):</strong> <input type="text" value={this.state.integratedGradients.hypothesisTopK} onChange={this.handleTopKChange('hypothesisTopK', 'integratedGradients')}/> 
+              <br />
+              <p><strong>Saliency Map for Premise:</strong></p>
+              {igPremiseTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={igPremiseTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                                                                    format: 'hex',
+                                                                                                                                    nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show premise interpretation</p>}
+                                                                                           
+              <p><strong>Saliency Map for Hypothesis:</strong></p>
+              {igHypothesisTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={igHypothesisTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                                                                          format: 'hex',
+                                                                                                                                          nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show hypothesis interpretation</p>}
+                                                                                              
+              <button
+                type="button"
+                className="btn"
+                style={{margin: "30px 0px"}}
+                onClick={ () => interpretModel(requestData, 'integrated_gradients_interpreter') }>Interpret Prediction
               </button>
             </AccordionItemBody>
           </AccordionItem>

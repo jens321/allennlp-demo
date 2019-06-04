@@ -53,11 +53,11 @@ class Model extends React.Component {
       });
     }
 
-    interpretModel(inputs) {
-      console.log('inputs', inputs)
+    interpretModel(inputs, interpreter) {
+      console.log('interpreter', Object.assign(inputs, {interpreter}))
       const { apiUrlInterpret } = this.props
 
-      fetch(apiUrlInterpret(inputs), {
+      fetch(apiUrlInterpret(Object.assign(inputs, {interpreter})), {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -68,7 +68,11 @@ class Model extends React.Component {
         return response.json();
       }).then((json) => {
         console.log(json)
-        this.setState({interpretData: json})
+        let stateUpdate = Object.assign({}, this.state)
+        console.log('STATE UPDATE 1', stateUpdate['interpretData'])
+        stateUpdate['interpretData'] = Object.assign({}, { [interpreter]: json }, stateUpdate['interpretData'])
+        console.log('STATE UPDATE', stateUpdate)
+        this.setState(stateUpdate)
       })
     }
 
