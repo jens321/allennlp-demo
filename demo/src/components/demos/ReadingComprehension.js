@@ -158,15 +158,13 @@ const generateInterpretation = (requestData,
             <div className="accordion__arrow" role="presentation"/>
           </AccordionItemTitle>
           <AccordionItemBody>
-            <br />
-            <strong>Top K gradients (Passage):</strong> <input type="text" value={simpleGradients.passageTopK} onChange={handleTopKChange('passageTopK', 'simpleGradients')}/><br />  
-            <strong>Top K gradients (Question):</strong> <input type="text" value={simpleGradients.questionTopK} onChange={handleTopKChange('questionTopK', 'simpleGradients')}/><br />  
-            <TextSaliencyMap tokensWithWeights={gradientPassageTokensWithWeights} colormapProps={{colormap: 'copper',
+            { gradientPassageTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={gradientPassageTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                         format: 'hex',
-                                                                                        nshades: 20}} /><br />
-            <TextSaliencyMap tokensWithWeights={gradientQuestionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                        nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show passage interpretation</p> }
+            <br />
+            { gradientQuestionTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={gradientQuestionTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                               format: 'hex',
-                                                                                              nshades: 20}} />
+                                                                                              nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show question interpretation</p> }
             <button
               type="button"
               className="btn"
@@ -185,15 +183,13 @@ const generateInterpretation = (requestData,
               <div className="accordion__arrow" role="presentation"/>
             </AccordionItemTitle>
             <AccordionItemBody>
-            <br />
-            <strong>Top K gradients (Passage):</strong> <input type="text" value={integratedGradients.passageTopK} onChange={handleTopKChange('passageTopK', 'integratedGradients')}/><br />  
-            <strong>Top K gradients (Question):</strong> <input type="text" value={integratedGradients.questionTopK} onChange={handleTopKChange('questionTopK', 'integratedGradients')}/><br />  
-            <TextSaliencyMap tokensWithWeights={igPassageTokensWithWeights} colormapProps={{colormap: 'copper',
+            { igPassageTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={igPassageTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                         format: 'hex',
-                                                                                        nshades: 20}} /><br />
-            <TextSaliencyMap tokensWithWeights={igQuestionTokensWithWeights} colormapProps={{colormap: 'copper',
+                                                                                        nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show passage interpretation</p> }
+            <br />
+            { igQuestionTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={igQuestionTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                               format: 'hex',
-                                                                                              nshades: 20}} />
+                                                                                              nshades: 20}} /> : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show passage interpretation</p> }
             <button
               type="button"
               className="btn"
@@ -207,46 +203,18 @@ const generateInterpretation = (requestData,
   )
 }
 
-const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passage_tokens, questionTopK, passageTopK) => {
-  console.log("sakdjflkja;slkdjf", questionGrads, passageGrads)
-  // map to objects with indices
-  let questionGradsWithIdx = questionGrads.map((grad, idx) => { return {grad, idx} })
-  console.log('question GRADS', questionGradsWithIdx)
-  let passageGradsWithIdx = passageGrads.map((grad, idx) => { return {grad, idx} })
-  console.log('passage GRADS', passageGradsWithIdx)
-
-  function grad_compare(obj1, obj2) {
-    return obj2.grad - obj1.grad
-  }
-
-  // sort and take top-k
-  const topKQuestionGrads = questionGradsWithIdx.sort(grad_compare).slice(0, questionTopK)
-  console.log('TOPK QUESTION GRADS', topKQuestionGrads)
-  const topKPassageGrads = passageGradsWithIdx.sort(grad_compare).slice(0, passageTopK)
-  console.log('TOPK PASSAGE GRADS', topKPassageGrads)
-
-  // Store set of weights we want to visualize
-  const validQuestionGrads = new Set(topKQuestionGrads.map((el) => el.idx))
-  const validPassageGrads = new Set(topKPassageGrads.map((el) => el.idx))
+const getTokenWeightPairs = (questionGrads, passageGrads, question_tokens, passage_tokens) => {
 
   // We do 1 - weight to get the colormap scaling right
   const questionTokensWithWeights = question_tokens.map((token, idx) => {
-    if (validQuestionGrads.has(idx)) {
-      let weight = questionGrads[idx]
-      return {token, weight: 1 - weight}
-    } else {
-      return {token, weight: undefined}
-    }
+    let weight = questionGrads[idx]
+    return {token, weight: 1 - weight}
   })
 
   // We do 1 - weight to get the colormap scaling right
   const passageTokensWithWeights = passage_tokens.map((token, idx) => {
-    if (validPassageGrads.has(idx)) {
       let weight = passageGrads[idx]
       return {token, weight: 1 - weight}
-    } else {
-      return {token, weight: undefined}
-    }
   })
 
   return [questionTokensWithWeights, passageTokensWithWeights]
@@ -270,7 +238,7 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData,
       const { instance_1 } = simple_gradients_interpreter
       const { grad_input_1, grad_input_2 } = instance_1
 
-      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens, simpleGradients.questionTopK, simpleGradients.passageTopK)
+      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens)
       gradientQuestionTokensWithWeights = tokensWithWeights[0]
       gradientPassageTokensWithWeights = tokensWithWeights[1] 
     } 
@@ -279,7 +247,7 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData,
       const { instance_1 } = integrated_gradients_interpreter
       const { grad_input_1, grad_input_2 } = instance_1
 
-      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens, integratedGradients.questionTopK, integratedGradients.passageTopK)
+      let tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, question_tokens, passage_tokens)
       igQuestionTokensWithWeights = tokensWithWeights[0]
       igPassageTokensWithWeights = tokensWithWeights[1]
     }
@@ -463,38 +431,12 @@ const AnswerByType = ({requestData, responseData, interpretModel, interpretData,
   return NoAnswer();
 }
 
-class Output extends React.Component {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      integratedGradients: {
-        passageTopK: 3,
-        questionTopK: 3
-      },
-      simpleGradients: {
-        passageTopK: 3,
-        questionTopK: 3 
-      }
-    }
-
-    this.handleTopKChange = (fieldName, interpreter) => e => {
-      if (e.target.value.trim() !== "") {
-        let stateUpdate = Object.assign({}, this.state)
-        console.log('state update', stateUpdate)
-        stateUpdate[interpreter][fieldName] = parseInt(e.target.value, 10)
-        this.setState(stateUpdate)
-      }
-    }
-  }
-
-  render() {
-    return (
-      <div className="model__content answer">
-        <AnswerByType {...this.props} {...this.state} handleTopKChange={this.handleTopKChange} />
-      </div>
-    )
-  }
+const Output = (props) => {
+  return (
+    <div className="model__content answer">
+      <AnswerByType {...props}/>
+    </div>
+  )
 }
 
 const addSnippet = (example) => {
