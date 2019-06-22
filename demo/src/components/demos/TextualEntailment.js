@@ -82,103 +82,51 @@ const judgments = {
   NEUTRAL: <span>there is <strong>no correlation</strong> between the premise and hypothesis</span>
 }
 
-const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens, premiseTopK, hypothesisTopK) => {
-  // map to objects with indices
-  let premiseGradsWithIdx = premiseGrads.map((grad, idx) => { return {grad, idx} })
-  console.log('PREMISE GRADS', Object.assign({}, premiseGradsWithIdx))
-  let hypothesisGradsWithIdx = hypothesisGrads.map((grad, idx) => { return {grad, idx} })
-
-  function grad_compare(obj1, obj2) {
-    return obj2.grad - obj1.grad
-  }
-
-  // sort and take top-k
-  const topKPremiseGrads = premiseGradsWithIdx.sort(grad_compare).slice(0, premiseTopK)
-  console.log('TOPK PREMISE GRADS', topKPremiseGrads)
-  const topKHypothesisGrads = hypothesisGradsWithIdx.sort(grad_compare).slice(0, hypothesisTopK)
-
-  // Store set of weights we want to visualize
-  const validPremiseGrads = new Set(topKPremiseGrads.map((el) => el.idx))
-  const validHypothesisGrads = new Set(topKHypothesisGrads.map((el) => el.idx))
+const getTokenWeightPairs = (premiseGrads, hypothesisGrads, premise_tokens, hypothesis_tokens) => {
 
   // We do 1 - weight to get the colormap scaling right
   const premiseTokensWithWeights = premise_tokens.map((token, idx) => {
-    if (validPremiseGrads.has(idx)) {
-      let weight = premiseGrads[idx]
-      return {token, weight: 1 - weight}
-    } else {
-      return {token, weight: undefined}
-    }
+    let weight = premiseGrads[idx]
+    return { token, weight: 1 - weight }
   })
 
   // We do 1 - weight to get the colormap scaling right
   const hypothesisTokensWithWeights = hypothesis_tokens.map((token, idx) => {
-    if (validHypothesisGrads.has(idx)) {
-      let weight = hypothesisGrads[idx]
-      return {token, weight: 1 - weight}
-    } else {
-      return {token, weight: undefined}
-    }
+    let weight = hypothesisGrads[idx]
+    return { token, weight: 1 - weight }
   })
 
   return [premiseTokensWithWeights, hypothesisTokensWithWeights]
 }
 
-class Output extends React.Component {
-  constructor(props) {
-    super(props)
+const Output = ({ requestData, responseData, interpretData, interpretModel }) => {
+  const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
 
-    this.state = {
-      integratedGradients: {
-        premiseTopK: 3,
-        hypothesisTopK: 3
-      },
-      simpleGradients: {
-        premiseTopK: 3,
-        hypothesisTopK: 3 
-      }
-    }
+  const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {[GRAD_INTERPRETER]: undefined, [IG_INTERPRETER]: undefined} 
 
-    this.handleTopKChange = (fieldName, interpreter) => e => {
-      if (e.target.value.trim() !== "") {
-        let stateUpdate = Object.assign({}, this.state)
-        console.log('state update', stateUpdate)
-        stateUpdate[interpreter][fieldName] = parseInt(e.target.value, 10)
-        this.setState(stateUpdate)
-      }
-    }
+  let gradientPremiseTokensWithWeights = []
+  let gradientHypothesisTokensWithWeights = []
+
+  let igPremiseTokensWithWeights = []
+  let igHypothesisTokensWithWeights = []
+
+  if (simple_gradients_interpreter) {
+    const { instance_1 } = simple_gradients_interpreter
+    const { grad_input_1, grad_input_2 } = instance_1 
+
+    const tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens)
+    gradientPremiseTokensWithWeights = tokensWithWeights[0]
+    gradientHypothesisTokensWithWeights = tokensWithWeights[1]
   }
 
-  render() {
-    const { requestData, responseData, interpretData, interpretModel } = this.props 
-    const { label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens } = responseData
+  if (integrated_gradients_interpreter) {
+    const { instance_1 } = integrated_gradients_interpreter
+    const { grad_input_1, grad_input_2 } = instance_1 
 
-    const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {[GRAD_INTERPRETER]: undefined, [IG_INTERPRETER]: undefined} 
-  
-    let gradientPremiseTokensWithWeights = []
-    let gradientHypothesisTokensWithWeights = []
-
-    let igPremiseTokensWithWeights = []
-    let igHypothesisTokensWithWeights = []
-
-    if (simple_gradients_interpreter) {
-      const { instance_1 } = simple_gradients_interpreter
-      const { grad_input_1, grad_input_2 } = instance_1 
-
-      const tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens, this.state.simpleGradients.premiseTopK, this.state.simpleGradients.hypothesisTopK)
-      gradientPremiseTokensWithWeights = tokensWithWeights[0]
-      gradientHypothesisTokensWithWeights = tokensWithWeights[1]
-    }
-
-    if (integrated_gradients_interpreter) {
-      const { instance_1 } = integrated_gradients_interpreter
-      const { grad_input_1, grad_input_2 } = instance_1 
-
-      const tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens, this.state.integratedGradients.premiseTopK, this.state.integratedGradients.hypothesisTopK)
-      igPremiseTokensWithWeights = tokensWithWeights[0]
-      igHypothesisTokensWithWeights = tokensWithWeights[1]
-    }
-
+    const tokensWithWeights = getTokenWeightPairs(grad_input_2, grad_input_1, premise_tokens, hypothesis_tokens)
+    igPremiseTokensWithWeights = tokensWithWeights[0]
+    igHypothesisTokensWithWeights = tokensWithWeights[1]
+  }
 
     const [entailment, contradiction, neutral] = label_probs
     
@@ -237,7 +185,7 @@ class Output extends React.Component {
     const x = 0.5 * (2 * b + c) / (a + b + c)
     const y = (c / (a + b + c))
 
-    return (
+  return (
     <div className="model__content answer">
       <OutputField label="Summary">
       {summaryText}
@@ -281,10 +229,6 @@ class Output extends React.Component {
               <div className="accordion__arrow" role="presentation"/>
             </AccordionItemTitle>
             <AccordionItemBody>
-              <br />
-              <strong>Top K gradients (premise):</strong> <input type="text" value={this.state.simpleGradients.premiseTopK} onChange={this.handleTopKChange('premiseTopK', 'simpleGradients')}/><br />
-              <strong>Top K gradients (hypothesis):</strong> <input type="text" value={this.state.simpleGradients.hypothesisTopK} onChange={this.handleTopKChange('hypothesisTopK', 'simpleGradients')}/> 
-              <br />
               <p><strong>Saliency Map for Premise:</strong></p>
               {gradientPremiseTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={gradientPremiseTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                             format: 'hex',
@@ -313,10 +257,6 @@ class Output extends React.Component {
               <div className="accordion__arrow" role="presentation"/>
             </AccordionItemTitle>
             <AccordionItemBody>
-              <br />
-              <strong>Top K gradients (premise):</strong> <input type="text" value={this.state.integratedGradients.premiseTopK} onChange={this.handleTopKChange('premiseTopK', 'integratedGradients')}/><br />
-              <strong>Top K gradients (hypothesis):</strong> <input type="text" value={this.state.integratedGradients.hypothesisTopK} onChange={this.handleTopKChange('hypothesisTopK', 'integratedGradients')}/> 
-              <br />
               <p><strong>Saliency Map for Premise:</strong></p>
               {igPremiseTokensWithWeights.length !== 0 ? <TextSaliencyMap tokensWithWeights={igPremiseTokensWithWeights} colormapProps={{colormap: 'copper',
                                                                                                                                     format: 'hex',
@@ -364,8 +304,7 @@ class Output extends React.Component {
         </Accordion>
       </OutputField>
     </div>
-    );
-  }
+  );
 }
 
 const examples = [
