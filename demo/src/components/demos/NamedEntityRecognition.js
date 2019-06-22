@@ -204,12 +204,10 @@ const generateSaliencyMaps = (grads, words) => {
 
 const Output = ({ responseData, requestData, interpretModel, interpretData }) => {
     const { words, tags } = responseData
-    console.log(words)
-    console.log("INTERPRET DATA", interpretData)
     const { simple_gradients_interpreter, integrated_gradients_interpreter } = interpretData ? interpretData : {[GRAD_INTERPRETER]: undefined, [IG_INTERPRETER]: undefined}
 
-    let gradientSaliencyMaps
-    let igSaliencyMaps 
+    let gradientSaliencyMaps 
+    let igSaliencyMaps
     if (simple_gradients_interpreter) {
       gradientSaliencyMaps = generateSaliencyMaps(simple_gradients_interpreter, words)
     }
@@ -280,7 +278,8 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
                   <div className="accordion__arrow" role="presentation"/>
                 </AccordionItemTitle>
                 <AccordionItemBody>
-                  {gradientSaliencyMaps}
+                  <br />
+                  { gradientSaliencyMaps !== undefined ? gradientSaliencyMaps : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show interpretation</p> }
                   <button
                     type="button"
                     className="btn"
@@ -296,7 +295,8 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
                   <div className="accordion__arrow" role="presentation"/>
                 </AccordionItemTitle>
                 <AccordionItemBody>
-                  {igSaliencyMaps}
+                  <br />
+                  { igSaliencyMaps !== undefined ? igSaliencyMaps : <p style={{color: "#7c7c7c"}}>Press "interpret prediction" to show interpretation</p>}
                   <button
                     type="button"
                     className="btn"
