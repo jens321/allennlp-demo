@@ -114,7 +114,7 @@ class TextSaliencyMap extends React.Component {
             step="1"
             value={this.state.topK}
             className="slider"
-            onChange={this.handleTopKChange} />
+            onChange={this.handleTopKChange} style={{ padding: "0px", margin: "0px" }} />
       </div>
     )
   }

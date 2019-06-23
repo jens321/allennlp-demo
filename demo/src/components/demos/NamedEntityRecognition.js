@@ -177,7 +177,7 @@ const TokenSpan = ({ token }) => {
     }
 }
 
-const generateSaliencyMaps = (grads, words) => {
+const generateSaliencyMaps = (grads, words, relevantTokens) => {
   let saliencyMaps = []
 
   // NOTE: javascript object properties order is not guaranteed
@@ -189,14 +189,18 @@ const generateSaliencyMaps = (grads, words) => {
       let weight = cur_grad[idx]
       return {token, weight: 1 - weight}
     })
+
     saliencyMaps.push(
-    <div key={i}>
-      <TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} colormapProps={{ colormap: 'copper',
-                                                                                      format: 'hex',
-                                                                                      nshades: 20
-                                                                                    }} />
-      <br />
-    </div>)
+      <div key={i} style={{ display: "flex", flexWrap: "wrap" }}>
+        <p style={{ padding: "2px", margin: "3px" }}><strong>Showing interpretation for</strong></p>
+        <TokenSpan key={i} token={relevantTokens[i-1]} />
+        <TextSaliencyMap tokensWithWeights={sentenceTokensWithWeights} colormapProps={{ colormap: 'copper',
+                                                                                        format: 'hex',
+                                                                                        nshades: 20
+                                                                                      }} />
+        <br />
+      </div>
+    )
   }
 
   return saliencyMaps 
@@ -208,13 +212,6 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
 
     let gradientSaliencyMaps 
     let igSaliencyMaps
-    if (simple_gradients_interpreter) {
-      gradientSaliencyMaps = generateSaliencyMaps(simple_gradients_interpreter, words)
-    }
-
-    if (integrated_gradients_interpreter) {
-      igSaliencyMaps = generateSaliencyMaps(integrated_gradients_interpreter, words)
-    }
 
     // "B" = "Beginning" (first token in a sequence of tokens comprising an entity)
     // "I" = "Inside" (token in a sequence of tokens (that isn't first or last in its sequence) comprising an entity)
@@ -265,6 +262,21 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
       }
     });
 
+    let relevantTokens = []
+    formattedTokens.forEach(token => {
+      if (token.entity !== null) {
+        relevantTokens.push(token)
+      }
+    })
+
+    if (simple_gradients_interpreter) {
+      gradientSaliencyMaps = generateSaliencyMaps(simple_gradients_interpreter, words, relevantTokens)
+    }
+
+    if (integrated_gradients_interpreter) {
+      igSaliencyMaps = generateSaliencyMaps(integrated_gradients_interpreter, words, relevantTokens)
+    }
+    
     return (
       <div className="model__content model__content--ner-output">
         <div className="form__field">
