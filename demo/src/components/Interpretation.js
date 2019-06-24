@@ -1,6 +1,7 @@
 import React from 'react'
 import colormap from 'colormap'
 import styled from 'styled-components';
+import { Tooltip } from './Shared';
 
 // interface Props extends DefaultProps {
 //   tokensWithWeights: {token: string, weight: number}[];
@@ -62,9 +63,12 @@ class TextSaliencyMap extends React.Component {
       result_string.push(
         // IMPORTANT: * the colormap pictures for colormap js go from left to right!
         //            * This means that for RdBu, low extreme is blue and high extreme is red 
-        <ColorizedToken backgroundColor={topKIdx.has(idx) ? colors[Math.round(obj.weight * (colormapProps.nshades - 1))] : 'transparent'}
-                        key={idx}>{obj.token}
-        </ColorizedToken>
+        <label key={idx} data-tip={(1 - obj.weight).toFixed(5)} style={{ display: "inline-block" }} >
+          <ColorizedToken backgroundColor={topKIdx.has(idx) ? colors[Math.round(obj.weight * (colormapProps.nshades - 1))] : 'transparent'}
+                          key={idx}>
+                          {obj.token}
+          </ColorizedToken>
+        </label>
       )
     })
 
@@ -107,6 +111,7 @@ class TextSaliencyMap extends React.Component {
     return (
       <div>
         {token_color_map}
+        <Tooltip />
         <input
             type="range"
             min={0}
@@ -115,6 +120,7 @@ class TextSaliencyMap extends React.Component {
             value={this.state.topK}
             className="slider"
             onChange={this.handleTopKChange} style={{ padding: "0px", margin: "0px" }} />
+        <br /><br />
       </div>
     )
   }
