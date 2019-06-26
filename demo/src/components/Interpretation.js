@@ -132,8 +132,8 @@ class TextSaliencyMap extends React.Component {
 
 const ColorizedToken = styled.span`
   background-color: ${props => props.backgroundColor};
-  padding: 5px;
-  margin: 5px;
+  padding: 1px;
+  margin: 1px;
   display: inline-block;
   border-radius: 3px;
 `;
