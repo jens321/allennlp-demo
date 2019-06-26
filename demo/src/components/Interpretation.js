@@ -63,7 +63,7 @@ class TextSaliencyMap extends React.Component {
       result_string.push(
         // IMPORTANT: * the colormap pictures for colormap js go from left to right!
         //            * This means that for RdBu, low extreme is blue and high extreme is red 
-        <label key={idx} data-tip={(1 - obj.weight).toFixed(5)} style={{ display: "inline-block" }} >
+        <label key={idx} data-tip={(1 - obj.weight).toFixed(3)} style={{ display: "inline-block" }} >
           <ColorizedToken backgroundColor={topKIdx.has(idx) ? colors[Math.round(obj.weight * (colormapProps.nshades - 1))] : 'transparent'}
                           key={idx}>
                           {obj.token}
@@ -116,7 +116,7 @@ class TextSaliencyMap extends React.Component {
             type="range"
             min={0}
             max={tokensWithWeights.length}
-            step="1"
+            step="1"            
             value={this.state.topK}
             className="slider"
             onChange={this.handleTopKChange} style={{ padding: "0px", margin: "0px" }} />

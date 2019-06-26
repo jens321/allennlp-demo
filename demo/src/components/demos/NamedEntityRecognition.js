@@ -324,6 +324,7 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
 }
 
 const examples = [
+    "This shirt was bought at Grandpa Joe's.",
     "AllenNLP is a PyTorch-based natural language processing library developed at the Allen Institute for Artificial Intelligence in Seattle.",
     "Did Uriah honestly think he could beat The Legend of Zelda in under three hours?",
     "Michael Jordan is a professor at Berkeley.",
