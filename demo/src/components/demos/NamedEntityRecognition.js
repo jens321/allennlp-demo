@@ -284,7 +284,7 @@ const Output = ({ responseData, requestData, interpretModel, interpretData }) =>
             {formattedTokens.map((token, i) => <TokenSpan key={i} token={token} />)}
           </HighlightContainer>
             <Accordion accordion={false}>
-              <AccordionItem expanded={false}>
+              <AccordionItem expanded={true}>
                 <AccordionItemTitle>
                   Simple Gradients Interpretation
                   <div className="accordion__arrow" role="presentation"/>
