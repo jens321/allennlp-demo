@@ -1,9 +1,17 @@
 import React from 'react';
-import { API_ROOT } from '../../api-config';
+import { ExternalLink, Tabs } from  '@allenai/varnish/components';
 import { withRouter } from 'react-router-dom';
+import styled from 'styled-components';
+
+import { API_ROOT } from '../../api-config';
 import Model from '../Model'
 import HierplaneVisualization from '../HierplaneVisualization'
 import TextVisualization from '../TextVisualization'
+import { UsageSection } from '../UsageSection';
+import { UsageHeader } from '../UsageHeader';
+import { UsageCode } from '../UsageCode';
+import { DemoVisualizationTabs } from './DemoStyles';
+import SyntaxHighlight from '../highlight/SyntaxHighlight';
 
 const title = "Semantic Role Labeling"
 
@@ -12,13 +20,10 @@ const description = (
       <span>
         Semantic Role Labeling (SRL) recovers the latent predicate argument structure of a sentence,
         providing representations that answer basic questions about sentence meaning, including “who” did “what” to “whom,” etc.
-        The AllenNLP toolkit provides the following SRL visualization, which can be used for any SRL model in AllenNLP.
         This page demonstrates a reimplementation of
       </span>
-      <a href="https://www.semanticscholar.org/paper/Deep-Semantic-Role-Labeling-What-Works-and-What-s-He-Lee/a3ccff7ad63c2805078b34b8514fa9eab80d38e9" target="_blank" rel="noopener noreferrer">{' '} a deep BiLSTM model (He et al, 2017)</a>
-      <span>
-        , which is currently state of the art for PropBank SRL (Newswire sentences).
-      </span>
+      <ExternalLink href="https://arxiv.org/abs/1904.05255" target="_blank" rel="noopener">{' '} a BERT based model (Shi et al, 2019)</ExternalLink>
+      <span> with some modifications (no additional parameters apart from a linear classification layer), which is currently the state of the art single model for English PropBank SRL (Newswire sentences). It achieves 86.49 test F1 on the Ontonotes 5.0 dataset.</span>
     </span>
   );
 
@@ -180,55 +185,52 @@ const VisualizationType = {
 };
 Object.freeze(VisualizationType);
 
-// Stateful output component
-class Output extends React.Component {
-    constructor(props) {
-        super(props)
+const NoOutputMessage = styled.div`
+  padding: 2rem;
+`;
 
-        this.state = { visualizationType: VisualizationType.TREE }
-    }
+const Output = props => {
+  const { responseData } = props
+  const { verbs } = responseData
 
-    render() {
-        const { visualizationType } = this.state
-        const { responseData } = this.props
-        const { verbs } = responseData
+  return (
+      <div className="model__content">
+        <DemoVisualizationTabs>
+          {
+            Object.keys(VisualizationType).map(tpe => {
+              const vizType = VisualizationType[tpe];
+              let viz = null;
 
-        let viz = null;
-        switch(visualizationType) {
-          case VisualizationType.TEXT:
-            viz = <TextVisualization verbs={verbs} model="srl"/>;
-            break;
-          case VisualizationType.TREE:
-          default:
-            viz = <HierplaneVisualization trees={toHierplaneTrees(responseData)} />
-            break;
-        }
-
-        return (
-            <div>
-                <ul className="visualization-types">
-                    {
-                        Object.keys(VisualizationType).map(tpe => {
-                            const vizType = VisualizationType[tpe];
-                            const className = (
-                                visualizationType === vizType
-                                ? 'visualization-types__active-type'
-                                : null
-                            )
-                            return (
-                                <li key={vizType} className={className}>
-                                <a onClick={() => this.setState({ visualizationType: vizType })}>
-                                    {vizType}
-                                </a>
-                                </li>
-                            )
-                        })
-                    }
-                </ul>
-                {viz}
-            </div>
-        )
-    }
+              // If there's no verbs, there's no output to display.
+              if (Array.isArray(verbs) && verbs.length > 0) {
+                switch(vizType) {
+                  case VisualizationType.TEXT:
+                    viz = <TextVisualization verbs={verbs} model="srl" />;
+                    break;
+                  case VisualizationType.TREE:
+                  default:
+                    viz = <HierplaneVisualization trees={toHierplaneTrees(responseData)} />
+                    break;
+                }
+              }
+      
+              if (viz == null) {
+                return (
+                  <NoOutputMessage>
+                    No output. Please revise the sentence and try again.
+                  </NoOutputMessage>
+                );
+              }
+              return (
+                <Tabs.TabPane key={vizType} tab={vizType}>
+                  {viz}
+                </Tabs.TabPane>
+              )
+            })
+          }
+        </DemoVisualizationTabs>
+      </div>
+  )
 }
 
 const examples = [
@@ -241,6 +243,49 @@ const examples = [
 
 const apiUrl = () => `${API_ROOT}/predict/semantic-role-labeling`
 
-const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output}
+const usage = (
+  <React.Fragment>
+    <UsageSection>
+      <UsageHeader>Prediction</UsageHeader>
+      <strong>On the command line (bash):</strong>
+      <UsageCode>
+          <SyntaxHighlight language="bash">
+          {`echo '{"sentence": "Did Uriah honestly think he could beat the game in under three hours?"}' | \\
+  allennlp predict https://s3-us-west-2.amazonaws.com/allennlp/models/bert-base-srl-2019.06.17.tar.gz -`}
+        </SyntaxHighlight>
+      </UsageCode>
+      <strong>As a library (Python):</strong>
+      <UsageCode>
+        <SyntaxHighlight language="python">
+          {`from allennlp.predictors.predictor import Predictor
+predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/bert-base-srl-2019.06.17.tar.gz")
+predictor.predict(
+  sentence="Did Uriah honestly think he could beat the game in under three hours?"
+)`}
+        </SyntaxHighlight>
+      </UsageCode>
+    </UsageSection>
+    <UsageSection>
+      <UsageHeader>Evaluation</UsageHeader>
+      <p>
+        The SRL model was evaluated on the CoNLL 2012 dataset.
+        Unfortunately we cannot release this data due to licensing restrictions by the LDC.
+        You can put together evaluation data yourself by following the CoNLL 2012 <a href="http://conll.cemantix.org/2012/data.html">instructions for working with the data</a>.
+      </p>
+    </UsageSection>
+    <UsageSection>
+      <UsageHeader>Training</UsageHeader>
+      <p>
+        The SRL model was evaluated on the CoNLL 2012 dataset.
+        Unfortunately we cannot release this data due to licensing restrictions by the LDC.
+        You can put together evaluation data yourself by following the CoNLL 2012 instructions for working with the data.
+        Once you have compiled the dataset, you can use the configuration file at <a href="https://github.com/allenai/allennlp/blob/master/training_config/semantic_role_labeler.jsonnet">training_config/semantic_role_labeler.jsonnet</a> to train.
+      </p>
+    </UsageSection>
+  </React.Fragment>
+)
+
+
+const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output, usage}
 
 export default withRouter(props => <Model {...props} {...modelProps}/>)

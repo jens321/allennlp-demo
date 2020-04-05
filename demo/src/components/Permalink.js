@@ -1,4 +1,7 @@
 import React from 'react';
+import { Button } from '@allenai/varnish/components';
+
+import { FormField, FormLabel } from '../Form';
 
 // from https://stackoverflow.com/a/33928558/1076346
 function copyToClipboard(text) {
@@ -24,8 +27,6 @@ function copyToClipboard(text) {
 }
 
 class Permalink extends React.Component {
-
-
     render() {
         const { slug } = this.props;
 
@@ -40,11 +41,11 @@ class Permalink extends React.Component {
 
         return (
             <div className="model__content">
-                <div className="form__field">
-                    <label>Permalink:</label>
-                    <input type="text" disabled="true" className="permalink" id="permalink" value={permalink}/>
-                    <button className="copy__to__clipboard" onClick={() => copyToClipboard(permalink)}>Copy to Clipboard</button>
-                </div>
+                <FormField>
+                    <FormLabel>Permalink:</FormLabel>
+                    <FormInput variant="text" disabled className="permalink" id="permalink" value={permalink}/>
+                    <Button className="copy__to__clipboard" onClick={() => copyToClipboard(permalink)}>Copy to Clipboard</Button>
+                </FormField>
             </div>
         )
     }

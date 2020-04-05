@@ -1,4 +1,6 @@
 import React from 'react';
+import styled from 'styled-components';
+
 import '../css/Pane.css';
 import '../css/model.css';
 import '../css/passage.css';
@@ -73,17 +75,21 @@ export class PaneRight extends React.Component {
   <PaneBottom /> Component
 *******************************************************************************/
 
-export class PaneBottom extends React.Component {
+export class PaneBottomBase extends React.Component {
   render() {
     const { outputState } = this.props;
 
     return (
-      <ResultDisplay resultPane="bottom" outputState={outputState}>
+      <ResultDisplay className={this.props.className} resultPane="bottom" outputState={outputState}>
         {this.props.children}
       </ResultDisplay>
     )
   }
 }
+
+export const PaneBottom = styled(PaneBottomBase)`
+  background: ${({theme}) => theme.palette.common.white.hex};
+`;
 
 
 /*******************************************************************************
@@ -94,7 +100,7 @@ export class PaneLeft extends React.Component {
 
     render () {
       return (
-        <div className="pane__left model__input">
+        <div className="pane__left">
           {this.props.children}
         </div>
       );
@@ -105,13 +111,20 @@ export class PaneLeft extends React.Component {
 <PaneTop /> Component
 *******************************************************************************/
 
-export class PaneTop extends React.Component {
+class PaneTopBase extends React.Component {
 
   render () {
     return (
-      <div className="pane__top model__input">
+      <div className={this.props.className}>
         {this.props.children}
-      </div>
+      </ div>
     );
   }
 }
+
+export const PaneTop = styled(PaneTopBase)`
+  background-color: ${({theme}) => theme.palette.common.white.hex};
+  width: 100%;
+  align-self: stretch;
+  display: block;
+`;

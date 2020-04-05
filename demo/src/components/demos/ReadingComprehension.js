@@ -11,8 +11,24 @@ import Model from '../Model'
 import OutputField from '../OutputField'
 import { API_ROOT } from '../../api-config';
 import { truncateText } from '../DemoInput'
+import { UsageSection } from '../UsageSection';
+import { UsageCode } from '../UsageCode';
+import SyntaxHighlight from '../highlight/SyntaxHighlight';
+import SaliencyMaps from '../Saliency'
+import InputReductionComponent from '../InputReduction'
+import HotflipComponent from '../Hotflip'
+import {
+  GRAD_INTERPRETER,
+  IG_INTERPRETER,
+  SG_INTERPRETER,
+  INPUT_REDUCTION_ATTACKER,
+  HOTFLIP_ATTACKER
+} from '../InterpretConstants'
 
 const title = "Reading Comprehension"
+
+const NAME_OF_INPUT_TO_ATTACK = "question"
+const NAME_OF_GRAD_INPUT = "grad_input_2"
 
 const description = (
   <span>
@@ -21,14 +37,11 @@ const description = (
   </span>
   )
 
-const descriptionEllipsed = (
-  <span>
-    Reading comprehension is the task of answering questions about a passage of text to show that
-    the system…
-  </span>
-)
-
 const taskModels = [
+  {
+    name: "ELMo-BiDAF (trained on SQuAD)",
+    desc: "Same as the BiDAF model except it uses ELMo embeddings instead of GloVe."
+  },
   {
     name: "BiDAF (trained on SQuAD)",
     desc: "Reimplementation of BiDAF (Seo et al, 2017), or Bi-Directional Attention Flow,<br/>a widely used MC baseline that achieved state-of-the-art accuracies on<br/>the SQuAD dataset (Wikipedia sentences) in early 2017."
@@ -40,7 +53,8 @@ const taskModels = [
 ]
 
 const taskEndpoints = {
-  "BiDAF (trained on SQuAD)": "machine-comprehension", // TODO: we should rename tha back-end model to reading-comprehension
+  "ELMo-BiDAF (trained on SQuAD)": "elmo-reading-comprehension",
+  "BiDAF (trained on SQuAD)": "reading-comprehension",
   "NAQANet (trained on DROP)": "naqanet-reading-comprehension"
 };
 
@@ -55,7 +69,7 @@ const fields = [
 const Attention = ({passage_question_attention, question_tokens, passage_tokens}) => {
   if(passage_question_attention && question_tokens && passage_tokens) {
     return (
-        <OutputField label="Model internals">
+        <OutputField label="Model Internals">
           <Accordion accordion={false}>
             <AccordionItem expanded={false}>
               <AccordionItemTitle>
@@ -131,13 +145,77 @@ const ArithmeticEquation = ({numbers}) => {
   return null;
 }
 
-const AnswerByType = ({requestData, responseData}) => {
+const getGradData = ({ grad_input_1: gradInput1, grad_input_2: gradInput2 }) => {
+  // Not sure why, but it appears that the order of the gradients is reversed for these.
+  return [gradInput2, gradInput1];
+}
+
+const MySaliencyMaps = ({interpretData, questionTokens, passageTokens, interpretModel, requestData}) => {
+  let simpleGradData = undefined;
+  let integratedGradData = undefined;
+  let smoothGradData = undefined;
+  if (interpretData) {
+    simpleGradData = GRAD_INTERPRETER in interpretData ? getGradData(interpretData[GRAD_INTERPRETER]['instance_1']) : undefined
+    integratedGradData = IG_INTERPRETER in interpretData ? getGradData(interpretData[IG_INTERPRETER]['instance_1']) : undefined
+    smoothGradData = SG_INTERPRETER in interpretData ? getGradData(interpretData[SG_INTERPRETER]['instance_1']) : undefined
+  }
+  const inputTokens = [questionTokens, passageTokens];
+  const inputHeaders = [<p><strong>Question:</strong></p>, <p><strong>Passage:</strong></p>];
+  const allInterpretData = {simple: simpleGradData, ig: integratedGradData, sg: smoothGradData};
+  return <SaliencyMaps interpretData={allInterpretData} inputTokens={inputTokens} inputHeaders={inputHeaders} interpretModel={interpretModel} requestData={requestData} />
+}
+
+const Attacks = ({attackData, attackModel, requestData}) => {
+  const model = requestData ? requestData.model : undefined;
+  let hotflipData = undefined;
+  if (attackData && "hotflip" in attackData) {
+    hotflipData = attackData["hotflip"];
+    const output = hotflipData["outputs"];
+    let newPrediction = '';
+    if ('best_span_str' in output) { // BiDAF model
+      newPrediction = output['best_span_str'];
+    }
+    else if ('answer' in output) { // NAQANet model
+      const answerType = output["answer"]["answer_type"];
+      if (answerType === "count") {
+        newPrediction = output['answer']['count'];
+      }
+      else {
+        newPrediction = output['answer']['value'];
+      }
+    }
+    hotflipData["new_prediction"] = newPrediction;
+  }
+  let reducedInput = undefined;
+  if (attackData && "input_reduction" in attackData) {
+    const reductionData = attackData["input_reduction"];
+    reducedInput = {original: reductionData["original"], reduced: [reductionData["final"][0]]};
+  }
+
+  // NAQANet needs some fixing in allennlp.attackers.utils.get_fields_to_compare in order to work,
+  // so we're disabling it for now (see TODO in that function).
+  const inputReduction = model && model.includes('NAQANet') ?
+    " "
+  :
+    <InputReductionComponent reducedInput={reducedInput} reduceFunction={attackModel(requestData, INPUT_REDUCTION_ATTACKER, NAME_OF_INPUT_TO_ATTACK, NAME_OF_GRAD_INPUT)} />
+
+  return (
+    <OutputField label="Model Attacks">
+      <Accordion accordion={false}>
+        {inputReduction}
+        <HotflipComponent hotflipData={hotflipData} hotflipFunction={attackModel(requestData, HOTFLIP_ATTACKER, NAME_OF_INPUT_TO_ATTACK, NAME_OF_GRAD_INPUT)} />
+      </Accordion>
+    </OutputField>
+  )
+}
+
+const AnswerByType = ({ responseData, requestData, interpretData, interpretModel, attackData, attackModel}) => {
   if(requestData && responseData) {
     const { passage, question } = requestData;
-    const { answer } = responseData;
-    const { answer_type } = answer || {};
+    const { answer, question_tokens: questionTokens, passage_tokens: passageTokens } = responseData;
+    const { answer_type: answerType } = answer || {};
 
-    switch(answer_type) {
+    switch(answerType) {
       case "passage_span": {
         const { spans, value } = answer || {};
         if(question && passage && spans && value) {
@@ -162,6 +240,8 @@ const AnswerByType = ({requestData, responseData}) => {
                 {question}
               </OutputField>
 
+              <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel={interpretModel} requestData={requestData}/>
+              <Attacks attackData={attackData} attackModel={attackModel} requestData={requestData}/>
               <Attention {...responseData}/>
             </section>
           )
@@ -193,6 +273,8 @@ const AnswerByType = ({requestData, responseData}) => {
                   highlightStyles={spans.map(s => "highlight__answer")}/>
               </OutputField>
 
+              <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel = {interpretModel} requestData = {requestData}/>
+              <Attacks attackData={attackData} attackModel = {attackModel} requestData = {requestData}/>
               <Attention {...responseData}/>
             </section>
           )
@@ -221,6 +303,8 @@ const AnswerByType = ({requestData, responseData}) => {
                 {question}
               </OutputField>
 
+              <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel = {interpretModel} requestData = {requestData}/>
+              <Attacks attackData={attackData} attackModel = {attackModel} requestData = {requestData}/>
               <Attention {...responseData}/>
             </section>
           )
@@ -252,6 +336,8 @@ const AnswerByType = ({requestData, responseData}) => {
                 {question}
               </OutputField>
 
+              <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel = {interpretModel} requestData = {requestData}/>
+              <Attacks attackData={attackData} attackModel = {attackModel} requestData = {requestData}/>
               <Attention {...responseData}/>
             </section>
           )
@@ -260,20 +346,20 @@ const AnswerByType = ({requestData, responseData}) => {
       }
 
       default: { // old best_span_str path used by BiDAF model
-        const { best_span_str } = responseData;
-        if(question && passage && best_span_str) {
-          const start = passage.indexOf(best_span_str);
+        const { best_span_str: bestSpanStr } = responseData;
+        if(question && passage && bestSpanStr) {
+          const start = passage.indexOf(bestSpanStr);
           const head = passage.slice(0, start);
-          const tail = passage.slice(start + best_span_str.length);
+          const tail = passage.slice(start + bestSpanStr.length);
           return (
             <section>
               <OutputField label="Answer">
-                {best_span_str}
+                {bestSpanStr}
               </OutputField>
 
               <OutputField label="Passage Context">
                 <span>{head}</span>
-                <span className="highlight__answer">{best_span_str}</span>
+                <span className="highlight__answer">{bestSpanStr}</span>
                 <span>{tail}</span>
               </OutputField>
 
@@ -281,6 +367,8 @@ const AnswerByType = ({requestData, responseData}) => {
                 {question}
               </OutputField>
 
+              <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel = {interpretModel} requestData = {requestData}/>
+              <Attacks attackData={attackData} attackModel = {attackModel} requestData = {requestData}/>
               <Attention {...responseData}/>
             </section>
           )
@@ -387,7 +475,7 @@ const examples = [
           question: "How many years after the period of turmoil for the Dergs did the announcement of Mengistu Haile Mariam as head of state take place to try and restore order?",
         },
         {
-          passage: "After the Battle of Deçiq Ottoman government decided for peaceful means of suppression of the revolt because frequent clashes with Albanians attracted the attention of the  European Great Powers. On 11 June sultan Mehmed V visited Skopje where he was greeted enthusiastically by the local population together with two Albanian chieftains who swore their allegiance to the Ottoman sultan. On 15 June, the date of the Battle of Kosovo, he visited the site of the historical battle greeted by 100.000 people. During his visit to Kosovo vilayet he signed a general amnesty for all participants of the Albanian revolts of 1910 and 1911. He was welcomed by the choir of the Serbian Orthodox Seminary with Turkish songs and vice-consul Milan Rakić had gathered a large contingent of Serbs, but many Albanians boycotted the event. Ottoman representatives managed to deal with the leaders of Albanian rebels in Kosovo Vilayet and Scutari Vilayet separately, because they were not united and lacked central control. The Ottoman Empire first managed to pacify the northern Albanian malësorë  from Scutari Vilayet reaching a compromise during a meeting in Podgorica. In order to resolve the problems in the south, the Ottoman representatives invited Albanian southern leaders to a meeting in Tepelenë on 18 August 1911. They promised to meet most of their demands, like general amnesty, the opening of Albanian language schools, and the restriction that military service was to be performed only in the territory of the vilayets with substantial Albanian population.  Other demands included requiring administrative officers to learn the Albanian language, and that the possession of weapons would be permitted.", 
+          passage: "After the Battle of Deçiq Ottoman government decided for peaceful means of suppression of the revolt because frequent clashes with Albanians attracted the attention of the  European Great Powers. On 11 June sultan Mehmed V visited Skopje where he was greeted enthusiastically by the local population together with two Albanian chieftains who swore their allegiance to the Ottoman sultan. On 15 June, the date of the Battle of Kosovo, he visited the site of the historical battle greeted by 100.000 people. During his visit to Kosovo vilayet he signed a general amnesty for all participants of the Albanian revolts of 1910 and 1911. He was welcomed by the choir of the Serbian Orthodox Seminary with Turkish songs and vice-consul Milan Rakić had gathered a large contingent of Serbs, but many Albanians boycotted the event. Ottoman representatives managed to deal with the leaders of Albanian rebels in Kosovo Vilayet and Scutari Vilayet separately, because they were not united and lacked central control. The Ottoman Empire first managed to pacify the northern Albanian malësorë  from Scutari Vilayet reaching a compromise during a meeting in Podgorica. In order to resolve the problems in the south, the Ottoman representatives invited Albanian southern leaders to a meeting in Tepelenë on 18 August 1911. They promised to meet most of their demands, like general amnesty, the opening of Albanian language schools, and the restriction that military service was to be performed only in the territory of the vilayets with substantial Albanian population.  Other demands included requiring administrative officers to learn the Albanian language, and that the possession of weapons would be permitted.",
           question: "How many days after sultan Mehmed V visited Skopje did he visit the site of the Battle of Kosovo?"
         },
         {
@@ -447,12 +535,69 @@ const examples = [
 
 ]
 
-const apiUrl = ({model}) => {
-  const selectedModel = model || (taskModels[0] && taskModels[0].name);
-  const endpoint = taskEndpoints[selectedModel]
-  return `${API_ROOT}/predict/${endpoint}`
+
+const getUrl = (model, apiCall) => {
+    const selectedModel = model || (taskModels[0] && taskModels[0].name);
+    const endpoint = taskEndpoints[selectedModel]
+    return `${API_ROOT}/${apiCall}/${endpoint}`
 }
 
-const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output}
+const apiUrl = ({model}) => {
+    return getUrl(model, "predict")
+}
+
+const apiUrlInterpret = ({model}) => {
+    return getUrl(model, "interpret")
+}
+
+const apiUrlAttack = ({model}) => {
+    return getUrl(model, "attack")
+}
+
+const usage = (
+  <React.Fragment>
+    <UsageSection>
+      <h3>Prediction</h3>
+      <h5>On the command line (bash):</h5>
+      <UsageCode>
+        <SyntaxHighlight language="bash">
+          {`echo '{"passage": "The Matrix is a 1999 science fiction action film written and directed by The Wachowskis, starring Keanu Reeves, Laurence Fishburne, Carrie-Anne Moss, Hugo Weaving, and Joe Pantoliano.", "question": "Who stars in The Matrix?"}' | \\
+allennlp predict https://storage.googleapis.com/allennlp-public-models/bidaf-elmo-model-2018.11.30-charpad.tar.gz -`}
+        </SyntaxHighlight>
+      </UsageCode>
+      <h5>As a library (Python):</h5>
+      <UsageCode>
+        <SyntaxHighlight language="python">
+          {`from allennlp.predictors.predictor import Predictor
+predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/bidaf-elmo-model-2018.11.30-charpad.tar.gz")
+predictor.predict(
+  passage="The Matrix is a 1999 science fiction action film written and directed by The Wachowskis, starring Keanu Reeves, Laurence Fishburne, Carrie-Anne Moss, Hugo Weaving, and Joe Pantoliano.",
+  question="Who stars in The Matrix?"
+)`}
+        </SyntaxHighlight>
+      </UsageCode>
+    </UsageSection>
+    <UsageSection>
+      <h3>Evaluation</h3>
+      <UsageCode>
+        <SyntaxHighlight language="python">
+          {`allennlp evaluate \\
+  https://s3-us-west-2.amazonaws.com/allennlp/models/bidaf-model-2017.09.15-charpad.tar.gz \\
+  https://s3-us-west-2.amazonaws.com/allennlp/datasets/squad/squad-dev-v1.1.json`}
+        </SyntaxHighlight>
+      </UsageCode>
+    </UsageSection>
+    <UsageSection>
+      <h3>Training</h3>
+      <UsageCode>
+        <SyntaxHighlight language="python">
+          allennlp train training_config/bidaf.jsonnet -s output_path
+        </SyntaxHighlight>
+      </UsageCode>
+    </UsageSection>
+  </React.Fragment>
+)
+
+const modelProps = {apiUrl, apiUrlInterpret, apiUrlAttack, title, description, fields, examples, Output, usage}
 
 export default withRouter(props => <Model {...props} {...modelProps}/>)

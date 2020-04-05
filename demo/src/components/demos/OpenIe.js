@@ -1,22 +1,24 @@
 import React from 'react';
-import { API_ROOT } from '../../api-config';
+import { ExternalLink, Tabs } from '@allenai/varnish/components';
 import { withRouter } from 'react-router-dom';
+
+import { API_ROOT } from '../../api-config';
 import Model from '../Model'
 import HierplaneVisualization from '../HierplaneVisualization'
 import TextVisualization from '../TextVisualization'
+import { UsageSection } from '../UsageSection';
+import { UsageHeader } from '../UsageHeader';
+import { UsageCode } from '../UsageCode';
+import SyntaxHighlight from '../highlight/SyntaxHighlight';
+import { DemoVisualizationTabs } from './DemoStyles';
 
 const title = "Open Information Extraction";
 
 const description = (
   <span>
-    <span>
-    Given an input sentence, Open Information Extraction (Open IE) extracts a list of
-  propositions, each composed of a single predicate and an arbitrary number of arguments.
-    These often simplify syntactically complex sentences, and make their predicate-argument structure easily accessible for various downstream tasks.
-    The AllenNLP toolkit provides the following Open IE visualization, which can be used for any Open IE model in AllenNLP.
-      This page demonstrates a reimplementation of
-    </span>
-    <a href="https://www.semanticscholar.org/paper/Supervised-Open-Information-Extraction-Stanovsky-Michael/c82921a426fd8090564f459b0bd90cdb1e7a9e2d" target="_blank" rel="noopener noreferrer">{' '} a deep BiLSTM sequence prediction model (Stanovsky et al., 2018)</a>.
+    Given an input sentence, Open Information Extraction (Open IE) extracts a list of propositions, each composed of a single predicate and an arbitrary number of arguments.
+    These extractions break syntactically complex sentences into the relationships they express, which can then be used for various downstream tasks.
+    This page demonstrates a reimplementation of <ExternalLink href="https://www.semanticscholar.org/paper/Supervised-Open-Information-Extraction-Stanovsky-Michael/c82921a426fd8090564f459b0bd90cdb1e7a9e2d" target="_blank" rel="noopener">{' '} a deep BiLSTM sequence prediction model (Stanovsky et al., 2018)</ExternalLink>.
   </span>
 )
 
@@ -186,53 +188,36 @@ const VisualizationType = {
 };
 Object.freeze(VisualizationType);
 
-// Stateful output compoennt
-class Output extends React.Component {
-    constructor(props) {
-        super(props);
+const Output = props => {
+  const { responseData } = props
+  const { verbs } = responseData
 
-        this.state = { visualizationType: VisualizationType.TREE }
-    }
-
-    render() {
-        const { visualizationType } = this.state
-        const { responseData } = this.props
-        const { verbs } = responseData
-
-        let viz = null;
-        switch(visualizationType) {
-        case VisualizationType.TEXT:
-            viz = <TextVisualization verbs={verbs} model="oie"/>;
-            break;
-        case VisualizationType.TREE:
-        default:
-            viz = <HierplaneVisualization trees={toHierplaneTrees(responseData)} />
-            break;
-        }
-
-    return (
-      <div>
-          <ul className="visualization-types">
-            {Object.keys(VisualizationType).map(tpe => {
+  return (
+    <div className="model__content">
+      <DemoVisualizationTabs>
+          {
+            Object.keys(VisualizationType).map(tpe => {
               const vizType = VisualizationType[tpe];
-              const className = (
-                visualizationType === vizType
-                  ? 'visualization-types__active-type'
-                  : null
-              );
+              let viz = null;
+              switch(vizType) {
+                case VisualizationType.TEXT:
+                  viz = <TextVisualization verbs={verbs} model="oie"/>;
+                  break;
+                case VisualizationType.TREE:
+                default:
+                  viz = <HierplaneVisualization trees={toHierplaneTrees(responseData)} />
+                  break;
+              }
               return (
-                <li key={vizType} className={className}>
-                  <a onClick={() => this.setState({ visualizationType: vizType })}>
-                    {vizType}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-          {viz}
-      </div>
-    )
-  }
+                <Tabs.TabPane key={vizType} tab={vizType}>
+                  {viz}
+                </Tabs.TabPane>
+              )
+            })
+          }
+      </DemoVisualizationTabs>
+    </div>
+  )
 }
 
 const examples = [
@@ -247,6 +232,48 @@ const examples = [
 
 const apiUrl = () => `${API_ROOT}/predict/open-information-extraction`
 
-const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output}
+const usage = (
+  <React.Fragment>
+    <UsageSection>
+      <UsageHeader>Prediction</UsageHeader>
+      <strong>On the command line (bash):</strong>
+      <UsageCode>
+        <SyntaxHighlight language="bash">
+          {`echo '{"sentence": "John decided to run for office next month."}' | \\
+  allennlp predict https://s3-us-west-2.amazonaws.com/allennlp/models/openie-model.2018-08-20.tar.gz - --predictor=open-information-extraction`} />
+        </SyntaxHighlight>
+      </UsageCode>
+      <strong>As a library (Python):</strong>
+      <UsageCode>
+        <SyntaxHighlight language="python">
+          {`from allennlp.predictors.predictor import Predictor
+predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/openie-model.2018-08-20.tar.gz")
+predictor.predict(
+  sentence="John decided to run for office next month."
+)`} />
+        </SyntaxHighlight>
+      </UsageCode>
+    </UsageSection>
+    <UsageSection>
+      <UsageHeader>Evaluation</UsageHeader>
+      <p>
+        The Open Information extractor was evaluated on the OIE2016 corpus.
+        Unfortunately we cannot release this data due to licensing restrictions by the LDC.
+        You can get the data on <a href="https://github.com/gabrielStanovsky/oie-benchmark">the corpus homepage</a>.
+
+      </p>
+    </UsageSection>
+    <UsageSection>
+      <UsageHeader>Training</UsageHeader>
+      <p>
+        The Open Information extractor was evaluated on the OIE2016 corpus.
+        Unfortunately we cannot release this data due to licensing restrictions by the LDC.
+        You can get the data on <a href="https://github.com/gabrielStanovsky/oie-benchmark">the corpus homepage</a>.
+      </p>
+    </UsageSection>
+  </React.Fragment>
+)
+
+const modelProps = {apiUrl, title, description, descriptionEllipsed, fields, examples, Output, usage}
 
 export default withRouter(props => <Model {...props} {...modelProps}/>)

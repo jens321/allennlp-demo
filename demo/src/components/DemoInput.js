@@ -1,14 +1,24 @@
 import React from 'react';
+import styled from 'styled-components';
+import {
+    Button,
+    Select,
+    Icon,
+    Radio,
+} from '@allenai/varnish/components'
+
 import BeamSearch from './BeamSearch'
-import {RadioGroup, Radio, Tooltip} from './Shared'
-import ModelIntro from './ModelIntro'
+import { Tooltip } from './Shared'
 import '../css/Button.css'
+import { FormField, FormLabel, FormInput, FormTextArea, FormSelect } from './Form';
 
 const PATTERN_NON_WORD_CHAR = /\W/;
 const PATTERN_WORD_CHAR = /\w/;
 const ELLIPSIS = '…';
 const EXAMPLE_NAME_SEPARATOR = '@@';
 const DEFAULT_OPTION_GROUP = "DEFAULT_OPTION_GROUP";
+const TOOLTIP_ID = "model-tooltip";
+
 /**
  * Truncates the provided text such that no more than limit characters are rendered and adds an
  * ellipsis upon truncation.  If the text is shorter than the provided limit, the full text is
@@ -72,9 +82,9 @@ class DemoInput extends React.Component {
         this.state = inputState ? {...inputState} : {}
 
         // What happens when you change the example dropdown
-        this.handleExampleChange = e => {
-            if (e.target.value !== "") {
-                const { groupIndex, exampleIndex } = decodeExampleName(e.target.value)
+        this.handleExampleChange = eVal => {
+            if (eVal !== "-1") {
+                const { groupIndex, exampleIndex } = decodeExampleName(eVal)
                 const example = this.normalizedExamples[groupIndex][1][exampleIndex]
                 // Because the field names vary by model, we need to be indirect.
                 let stateUpdate = {}
@@ -97,15 +107,22 @@ class DemoInput extends React.Component {
         // inputs and also select inputs. The first argument is
         // the field name to update.
         this.handleInputChange = fieldName => e => {
-            let stateUpdate = {}
+            const stateUpdate = {}
             stateUpdate[fieldName] = e.target.value;
             this.setState(stateUpdate)
         }
 
-        // for radio input, the second param is simply the value
-        this.handleRadioInputChange = fieldName => value => {
-            let stateUpdate = {}
-            stateUpdate[fieldName] = value;
+        // Select input selection
+        this.handleSelectChange = fieldName => eVal => {
+            const stateUpdate = {}
+            stateUpdate[fieldName] = eVal;
+            this.setState(stateUpdate)
+        }
+
+        // Radio input selection
+        this.handleRadioChange = fieldName => e => {
+            const stateUpdate = {}
+            stateUpdate[fieldName] = e.target.value;
             this.setState(stateUpdate)
         }
 
@@ -122,7 +139,7 @@ class DemoInput extends React.Component {
         // depend on the previous outputs, so when we do a new run
         // we need to clear them out.
         this.cleanInputs = () => {
-            let inputs = {...this.state}
+            const inputs = {...this.state}
 
             fields.forEach((field) => {
                 (field.dependentInputs || []).forEach((name) => {
@@ -135,7 +152,7 @@ class DemoInput extends React.Component {
     }
 
     render() {
-        const { title, description, descriptionEllipsed, fields, selectedModel, outputState, responseData, inputState } = this.props
+        const { fields, selectedModel, outputState, responseData, inputState } = this.props
 
         // Only enable running the model if every required field has a value.
         const canRun = fields.every(field => field.optional || this.state[field.name])
@@ -150,7 +167,7 @@ class DemoInput extends React.Component {
         fields.forEach((field, idx) => {
             // The HTML id for this input:
             const inputId = `input--${selectedModel}-${field.name}`
-            const label = field.label ? <label htmlFor={`#${inputId}`}>{field.label}</label> : null
+            const label = field.label ? <FormLabel htmlFor={`#${inputId}`}>{field.label}</FormLabel> : null
 
             let input = null;
 
@@ -163,28 +180,30 @@ class DemoInput extends React.Component {
                         onKeyDown: canRun ? this.runOnEnter : undefined,
                         id: inputId,
                         type: "text",
-                        required: "true",
+                        required: true,
                         autoFocus: idx === 0,
                         placeholder: field.placeholder || "",
                         value: this.state[field.name],
-                        disabled: outputState === "working"
+                        disabled: outputState === "working",
+                        maxLength: field.maxLength || (field.type === "TEXT_INPUT" ? 1000 : 100000)
                     }
 
-                    input = field.type === "TEXT_AREA" ? <textarea {...props}/> : <input {...props}/>
+                    input = field.type === "TEXT_AREA" ? <FormTextArea {...props}/> : <FormInput {...props}/>
                     break
 
                 case "SELECT":
                     input = (
                         // If we have no value for this select, use the first option.
-                        <select value={this.state[field.name] || field.options[0]}
-                                onChange={this.handleInputChange(field.name)}
+                        <FormSelect value={this.state[field.name] || field.options[0]}
+                                onChange={this.handleSelectChange(field.name)}
+                                dropdownMatchSelectWidth = {false}
                                 disabled={outputState === "working"}>
                             {
                                 field.options.map((value) => (
-                                    <option key={value} value={value}>{value}</option>
+                                    <Select.Option key={value} value={value}>{value}</Select.Option>
                                 ))
                             }
-                        </select>
+                        </FormSelect>
                     )
                     break
 
@@ -203,19 +222,20 @@ class DemoInput extends React.Component {
                 case "RADIO":
                     input = (
                         // If we have no value for this select, use the first option.
-                        <RadioGroup
+                        <Radio.Group
+                            vertical={true}
                             name={inputId}
-                            selectedValue={this.state[field.name] || (field.options[0] && field.options[0].name)}
-                            onChange={this.handleRadioInputChange(field.name)}
+                            value={this.state[field.name] || (field.options[0] && field.options[0].name)}
+                            onChange={this.handleRadioChange(field.name)}
                             disabled={outputState === "working"}>
                             {
                                 field.options.map((opt) => (
-                                    <label key={opt.name} data-tip={opt.desc}>
-                                        <Radio value={opt.name}/>{opt.name}
-                                    </label>
+                                    <Radio key={opt.name} value={opt.name}>
+                                        <span data-tip={opt.desc} data-for={TOOLTIP_ID}> {opt.name} </span>
+                                    </Radio>
                                 ))
                             }
-                      </RadioGroup>
+                      </Radio.Group>
                     )
                     break
                 default:
@@ -223,10 +243,10 @@ class DemoInput extends React.Component {
             }
 
             const div = (
-                <div className="form__field" key={field.name}>
-                {label}
-                {input}
-                </div>
+                <FormField key={field.name}>
+                    {label}
+                    {input}
+                </FormField>
             )
 
             // By default we assume a field is just an input,
@@ -240,51 +260,70 @@ class DemoInput extends React.Component {
 
 
         return (
-            <div className="model__content answer">
-                <ModelIntro title={title} description={description} descriptionEllipsed={descriptionEllipsed}/>
-                <div className="form__instructions">
+            <React.Fragment>
+                <FormInstructions>
                     <span>Enter text or</span>
-                    <select
+                    <Select
+                        dropdownMatchSelectWidth = {false}
                         disabled={outputState === "working"}
-                        onChange={this.handleExampleChange}>
-                            <option value="">Choose an example...</option>
-                            {
-                                this.normalizedExamples.map((exampleInfo, groupIndex) => {
-                                    return OptionGroup(exampleInfo, groupIndex, fields)
-                                })
-                            }
-                    </select>
-                </div>
+                        onChange={this.handleExampleChange}
+                        defaultValue="-1">
+                        <Select.Option value="-1">Choose an example...</Select.Option>
+                        {this.normalizedExamples.map((exampleInfo, groupIndex) => {
+                            return SelectOptionGroup(exampleInfo, groupIndex, fields)
+                        })}
+                    </Select>
+                </FormInstructions>
                 {inputs}
-                <div className="form__field form__field--btn">
-                    <button
-                     id="input--mc-submit"
-                     type="button"
-                     disabled={!canRun || outputState === "working"}
-                     className="btn btn--icon-disclosure"
-                     onClick={ () => this.props.runModel(this.cleanInputs()) }>Run
-                        <svg>
-                            <use xlinkHref="#icon__disclosure"></use>
-                        </svg>
-                    </button>
-                </div>
+                <RunButtonArea>
+                    <Button
+                      variant="primary"
+                      disabled={!canRun || outputState === "working"}
+                      onClick={ () => this.props.runModel(this.cleanInputs()) }>Run
+                        <Icon type="right" />
+                    </Button>
+                </RunButtonArea>
                 {inputOutputs}
-                <Tooltip multiline/>
-            </div>
+                <Tooltip multiline id={TOOLTIP_ID} />
+            </React.Fragment>
         )
     }
 }
 
-function OptionGroup(exampleInfo, groupIndex, fields) {
+const FormInstructions = styled.div`
+  margin: ${({theme}) => `${theme.spacing.md} 0 ${theme.spacing.md}`};
+  transition: margin .2s ease;
+
+  span {
+    padding-right: ${({theme}) => theme.spacing.xs};
+    max-width: 9.375em;
+    color: ${({theme}) => theme.palette.text.secondary};
+  }
+
+  @media screen and (max-height: ${({theme}) => theme.breakpoints.md}) {
+    margin: ${({theme}) => `${theme.spacing.xs} 0 ${theme.spacing.xs}`};
+  }
+`;
+
+const RunButtonArea = styled.div`
+  display: flex;
+  flex-direction: row-reverse;
+  margin-top: ${({theme}) => theme.spacing.md};
+  svg {
+    fill: ${({theme}) => theme.palette.common.white.hex};
+  }
+`;
+
+function SelectOptionGroup(exampleInfo, groupIndex, fields) {
   const exampleType = exampleInfo[0]
   const examples = exampleInfo[1]
   if (!exampleType || exampleType === DEFAULT_OPTION_GROUP) {
       return RenderOptions(examples, groupIndex, fields)
   } else {
       return (
-          <optgroup label={exampleType}>
+          <Select.OptGroup label={exampleType} key={groupIndex}>
               {RenderOptions(examples, groupIndex, fields)}
-          </optgroup>
+          </Select.OptGroup>
       )
   }
 }
@@ -293,7 +332,7 @@ function RenderOptions(examples, groupIndex, fields) {
     return examples.map((example, exampleIndex) => {
         const encodedName = encodeExampleName(groupIndex, exampleIndex)
         return (
-            <option value={encodedName} key={encodedName}>{makeSnippet(example, fields)}</option>
+            <Select.Option value={encodedName} key={encodedName}>{makeSnippet(example, fields)}</Select.Option>
         )
     })
 }
