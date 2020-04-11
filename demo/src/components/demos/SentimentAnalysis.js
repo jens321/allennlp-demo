@@ -35,7 +35,7 @@ const description = (
     They achieve about 87% and 95.11% accuracy on the test set.
     </span>
     <p>
-      <b>Contributed by:</b> Zhaofeng Wu
+      <b>Contributed by:</b> <a href="https://zhaofengwu.github.io">Zhaofeng Wu</a>
     </p>
   </span>
 );
@@ -131,10 +131,7 @@ const Output = ({ responseData, requestData, interpretData, interpretModel, atta
 
   const [positiveClassProbability, negativeClassProbability] = responseData['probs']
   const prediction = negativeClassProbability < positiveClassProbability ? "Positive" : "Negative"
-
-  let t = requestData;
-  const tokens = t['sentence'].split(' '); // this model expects space-separated inputs
-
+  const tokens = responseData['tokens'] || requestData['sentence'].split(' ');
   // The RoBERTa-large model is very slow to be attacked
   const attacks = model && model.includes('RoBERTa') ?
     " "
