@@ -348,6 +348,7 @@ class App extends React.Component {
         // If the user entered text by typing don't overwrite it, as that feels
         // weird. If they clicked it overwrite it
         const output = choice === undefined ? this.state.output : data.output
+        console.log(data)
         this.setState({...data, output: sentence, loading: false})
         this.requestData = output;
       }
@@ -374,9 +375,11 @@ class App extends React.Component {
     let attackData = this.state.attackData;
     let tokens = [];
     if (this.state.tokens === undefined) {
+        console.log("coool!")
         tokens = [];
     }
     else {
+        console.log("tokens is full!", this.state.tokens)
         if (Array.isArray(this.state.tokens[0])) {
             tokens = this.state.tokens[0];
         }
