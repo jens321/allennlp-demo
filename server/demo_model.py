@@ -24,5 +24,6 @@ class DemoModel:
         self.overrides = overrides
 
     def predictor(self) -> Predictor:
+        print("****", self.archive_file)
         archive = load_archive(self.archive_file, overrides=self.overrides)
         return Predictor.from_archive(archive, self.predictor_name)

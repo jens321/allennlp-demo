@@ -131,6 +131,8 @@ const Output = ({ responseData, requestData, interpretData, interpretModel, atta
 
   const [positiveClassProbability, negativeClassProbability] = responseData['probs']
   const prediction = negativeClassProbability < positiveClassProbability ? "Positive" : "Negative"
+  console.log(responseData)
+  console.log(requestData['sentence'])
   const tokens = responseData['tokens'] || requestData['sentence'].split(' ');
   // The RoBERTa-large model is very slow to be attacked
   const attacks = model && model.includes('RoBERTa') ?

@@ -15,6 +15,6 @@ if (origin.includes(':3000')) {
     apiRoot = origin;
 }
 
-apiRoot = "http://abb522a3.ngrok.io"
+// apiRoot = "http://abb522a3.ngrok.io"
 
 export const API_ROOT = apiRoot;
