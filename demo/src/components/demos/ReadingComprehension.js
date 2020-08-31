@@ -53,6 +53,11 @@ const taskModels = [
     desc: "Reimplementation of BiDAF (Seo et al, 2017), or Bi-Directional Attention Flow,<br/>a widely used MC baseline that achieved state-of-the-art accuracies on<br/>the SQuAD dataset (Wikipedia sentences) in early 2017."
   },
   {
+    name: "Transformer QA (trained on SQuAD)",
+    desc: "comprehension model patterned after the proposed model in<br/>https://arxiv.org/abs/1810.04805 (Devlin et al), with improvements borrowed from the SQuAD<br/>model in the transformers project.",
+    modelId: "transformer-qa"
+  },
+  {
     name: "NAQANet (trained on DROP)",
     desc: "An augmented version of QANet that adds rudimentary numerical reasoning ability,<br/>trained on DROP (Dua et al., 2019), as published in the original DROP paper."
   },
@@ -63,7 +68,8 @@ const taskEndpoints = {
   "ELMo-BiDAF (trained on SQuAD)": "elmo-reading-comprehension",
   "BiDAF (trained on SQuAD)": "reading-comprehension",
   "NAQANet (trained on DROP)": "naqanet-reading-comprehension",
-  "NMN (trained on DROP)": "nmn-drop"
+  "NMN (trained on DROP)": "nmn-drop",
+  "Transformer QA (trained on SQuAD)": "transformer-qa"
 };
 
 const fields = [
@@ -158,6 +164,10 @@ const getGradData = ({ grad_input_1: gradInput1, grad_input_2: gradInput2 }) => 
   return [gradInput2, gradInput1];
 }
 
+const getGradDataBert = ({ grad_input_1: gradInput1 }) => {
+  return [gradInput1];
+}
+
 const MySaliencyMaps = ({interpretData, questionTokens, passageTokens, interpretModel, requestData}) => {
   let simpleGradData = undefined;
   let integratedGradData = undefined;
@@ -170,6 +180,22 @@ const MySaliencyMaps = ({interpretData, questionTokens, passageTokens, interpret
   const inputTokens = [questionTokens, passageTokens];
   const inputHeaders = [<p><strong>Question:</strong></p>, <p><strong>Passage:</strong></p>];
   const allInterpretData = {simple: simpleGradData, ig: integratedGradData, sg: smoothGradData};
+  return <SaliencyMaps interpretData={allInterpretData} inputTokens={inputTokens} inputHeaders={inputHeaders} interpretModel={interpretModel} requestData={requestData} />
+}
+
+const MySaliencyMapsBert = ({interpretData, tokens, interpretModel, requestData}) => {
+  let simpleGradData = undefined;
+  let integratedGradData = undefined;
+  let smoothGradData = undefined;
+  if (interpretData) {
+    simpleGradData = GRAD_INTERPRETER in interpretData ? getGradDataBert(interpretData[GRAD_INTERPRETER]['instance_1']) : undefined
+    integratedGradData = IG_INTERPRETER in interpretData ? getGradDataBert(interpretData[IG_INTERPRETER]['instance_1']) : undefined
+    smoothGradData = SG_INTERPRETER in interpretData ? getGradDataBert(interpretData[SG_INTERPRETER]['instance_1']) : undefined
+  }
+  const inputTokens = [tokens];
+  const inputHeaders = [<p><strong>Sentence:</strong></p>];
+  const allInterpretData = {simple: simpleGradData, ig: integratedGradData, sg: smoothGradData};
+  console.log("all interpret data", allInterpretData)
   return <SaliencyMaps interpretData={allInterpretData} inputTokens={inputTokens} inputHeaders={inputHeaders} interpretModel={interpretModel} requestData={requestData} />
 }
 
@@ -222,6 +248,10 @@ const AnswerByType = ({ responseData, requestData, interpretData, interpretModel
     const { passage, question } = requestData;
     const { answer, question_tokens: questionTokens, passage_tokens: passageTokens } = responseData;
     const { answer_type: answerType } = answer || {};
+
+    const tokens = responseData['tokens'];
+    console.log("response data", responseData);
+    console.log("tokens", tokens)
 
     switch(answerType) {
       case "passage_span": {
@@ -354,6 +384,7 @@ const AnswerByType = ({ responseData, requestData, interpretData, interpretModel
       }
 
       default: { // old best_span_str path used by BiDAF model
+        console.log("response data", responseData);
         const { best_span_str: bestSpanStr } = responseData;
         if(question && passage && bestSpanStr) {
           const start = passage.indexOf(bestSpanStr);
@@ -375,7 +406,8 @@ const AnswerByType = ({ responseData, requestData, interpretData, interpretModel
                 {question}
               </OutputField>
 
-              <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel = {interpretModel} requestData = {requestData}/>
+              {/* <MySaliencyMaps interpretData={interpretData} questionTokens={questionTokens} passageTokens={passageTokens} interpretModel = {interpretModel} requestData = {requestData}/> */}
+              <MySaliencyMapsBert interpretData={interpretData} tokens={tokens} interpretModel={interpretModel} requestData={requestData}/>
               <Attacks attackData={attackData} attackModel = {attackModel} requestData = {requestData}/>
               <Attention {...responseData}/>
             </section>

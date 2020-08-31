@@ -4,9 +4,14 @@
         "predictor_name": "reading-comprehension",
         "max_request_length": 311108
     },
+    "transformer-qa": {
+        "archive_file": "../gradient-regularization/adversarial_grads/QA/archives/bert_models/stop_token_baseline_model/stop_token_baseline_model.tar.gz",
+        "predictor_name": "transformer_qa",
+        "max_request_length": 311108
+    },
     "elmo-reading-comprehension": {
-        "archive_file": "https://storage.googleapis.com/allennlp-public-models/bidaf-elmo-model-2020.03.19.tar.gz",
-        "predictor_name": "reading-comprehension",
+        "archive_file": "../gradient-regularization/adversarial_grads/QA/archives/bert_models/first_token_simple_combined_model/first_token_simple_combined_model.tar.gz",
+        "predictor_name": "transformer_qa",
         "max_request_length": 311108
     },
     "naqanet-reading-comprehension": {
@@ -38,7 +43,7 @@
         "max_request_length": 13129
     },
     "roberta-snli": {
-        "archive_file": "https://storage.googleapis.com/allennlp-public-models/snli-roberta-large-2020.02.27.tar.gz",
+        "archive_file": "../gradient-regularization/adversarial_grads/NLI/archives/bert_models/stop_token_combined_model/stop_token_combined_model.tar.gz",
         "predictor_name": "textual-entailment",
         "max_request_length": 13129
     },
@@ -104,12 +109,13 @@
         "image": "gcr.io/ai2-reviz/allennlp-demo:584070b73f7eb6eb1f82af723295aec0a44ae3a9"
     },
     "glove-sentiment-analysis": {
-        "archive_file": "../gradient-regularization/adversarial_grads/archives/bert_models/baseline_model_1/sst_baseline_model.tar.gz",
+        "archive_file": "../gradient-regularization/adversarial_grads/SA/archives/bert_models/stop_token_baseline_model/stop_token_baseline_model.tar.gz",
         "predictor_name": "text_classifier",
-        "max_request_length": 1000
+        "max_request_length": 1000,
+        "memory": "4Gi"
     },
     "roberta-sentiment-analysis": {
-        "archive_file": "../gradient-regularization/adversarial_grads/archives/bert_models/combined_model_1/sst_combined_model.tar.gz",
+        "archive_file": "../gradient-regularization/adversarial_grads/SA/archives/bert_models/stop_token_simple_combined_model/stop_token_simple_combined_model.tar.gz",
         "predictor_name": "text_classifier",
         "max_request_length": 1000,
         "memory": "4Gi"

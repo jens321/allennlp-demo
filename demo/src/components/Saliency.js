@@ -45,6 +45,10 @@ export const SaliencyMaps = ({interpretData, inputTokens, inputHeaders, interpre
   const simpleGradData = interpretData.simple;
   const integratedGradData = interpretData.ig;
   const smoothGradData = interpretData.sg;
+
+  if (simpleGradData) console.log("simple grad inside", simpleGradData[0].map(x => x.toFixed(5)))
+  if (smoothGradData) console.log("smooth grad inside", smoothGradData[0].map(x => x.toFixed(5)))
+  if (integratedGradData) console.log("integrated grad inside", integratedGradData[0].map(x => x.toFixed(3)))
   const interpretationHeader = <>Model Interpretations <i><a href="https://allennlp.org/interpret" target="_blank" rel="noopener noreferrer" style={{paddingLeft: `1em`, fontWeight:100}}>What is this?</a></i></>
   return (
     <OutputField label={interpretationHeader}>

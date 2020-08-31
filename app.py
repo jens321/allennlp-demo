@@ -56,6 +56,7 @@ supported_interpret_models = {'named-entity-recognition',
                               'reading-comprehension',
                               'elmo-reading-comprehension',
                               'naqanet-reading-comprehension',
+                              'transformer-qa',
                               'masked-lm',
                               'next-token-lm'}
 
@@ -248,6 +249,8 @@ def make_app(build_dir: str,
 
         lowered_model_name = model_name.lower()
         model = app.predictors.get(lowered_model_name)
+        print('lowered name', lowered_model_name)
+        print("model", model)
         if model is None:
             raise ServerError("unknown model: {}".format(model_name), status_code=400)
         max_request_length = app.max_request_lengths[lowered_model_name]
@@ -307,7 +310,7 @@ def make_app(build_dir: str,
 
         # The model predictions are extremely verbose, so we only log the most human-readable
         # parts of them.
-        if "comprehension" in model_name:
+        if "comprehension" in model_name or model_name == "transformer_qa":
             if 'best_span_str' in prediction:
                 answer = prediction['best_span_str']
             else:

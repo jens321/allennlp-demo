@@ -148,6 +148,10 @@ const getGradData = ({ grad_input_1, grad_input_2 }) => {
   return [grad_input_2, grad_input_1];
 }
 
+const getGradDataBert = ({ grad_input_1: gradInput1 }) => {
+  return [gradInput1];
+}
+
 const MySaliencyMaps = ({interpretData, premise_tokens, hypothesis_tokens, interpretModel, requestData}) => {
   let simpleGradData = undefined;
   let integratedGradData = undefined;
@@ -160,6 +164,22 @@ const MySaliencyMaps = ({interpretData, premise_tokens, hypothesis_tokens, inter
   const inputTokens = [premise_tokens, hypothesis_tokens];
   const inputHeaders = [<p><strong>Premise:</strong></p>, <p><strong>Hypothesis:</strong></p>];
   const allInterpretData = {simple: simpleGradData, ig: integratedGradData, sg: smoothGradData};
+  return <SaliencyMaps interpretData={allInterpretData} inputTokens={inputTokens} inputHeaders={inputHeaders} interpretModel={interpretModel} requestData={requestData} />
+}
+
+const MySaliencyMapsBert = ({interpretData, tokens, interpretModel, requestData}) => {
+  let simpleGradData = undefined;
+  let integratedGradData = undefined;
+  let smoothGradData = undefined;
+  if (interpretData) {
+    simpleGradData = GRAD_INTERPRETER in interpretData ? getGradDataBert(interpretData[GRAD_INTERPRETER]['instance_1']) : undefined
+    integratedGradData = IG_INTERPRETER in interpretData ? getGradDataBert(interpretData[IG_INTERPRETER]['instance_1']) : undefined
+    smoothGradData = SG_INTERPRETER in interpretData ? getGradDataBert(interpretData[SG_INTERPRETER]['instance_1']) : undefined
+  }
+  const inputTokens = [tokens];
+  const inputHeaders = [<p><strong>Sentence:</strong></p>];
+  const allInterpretData = {simple: simpleGradData, ig: integratedGradData, sg: smoothGradData};
+  console.log("all interpret data", allInterpretData)
   return <SaliencyMaps interpretData={allInterpretData} inputTokens={inputTokens} inputHeaders={inputHeaders} interpretModel={interpretModel} requestData={requestData} />
 }
 
@@ -214,6 +234,14 @@ const Attacks = ({attackData, attackModel, requestData}) => {
 
 const Output = ({ responseData, requestData, interpretData, interpretModel, attackData, attackModel}) => {
   const model = requestData ? requestData.model : undefined;
+
+  const tokens = responseData['tokens'] || requestData['sentence'].split(' ');
+  console.log("tokens", tokens)
+  // The RoBERTa-large model is very slow to be attacked
+  const attacks = model && model.includes('RoBERTa') ?
+    " "
+  :
+    <Attacks attackData={attackData} attackModel={attackModel} requestData={requestData}/>
 
   let label_probs, h2p_attention, p2h_attention, premise_tokens, hypothesis_tokens;
   if (model && model.includes('RoBERTa')) {
@@ -282,7 +310,12 @@ const Output = ({ responseData, requestData, interpretData, interpretModel, atta
 
   // The RoBERTa-large models don't support interprets
   const accordion = model && model.includes('RoBERTa') ?
-    " "
+    <OutputField>
+      <Accordion accordion={false}>
+          <MySaliencyMapsBert interpretData={interpretData} tokens={tokens} interpretModel={interpretModel} requestData={requestData}/>
+          {attacks}
+      </Accordion>
+    </OutputField>
   :
     <OutputField>
       <Accordion accordion={false}>
